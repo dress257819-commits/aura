@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { apiGet, apiPost, ApiError } from "@/lib/api";
+import { getLocalMe } from "@/lib/auth";
+import { isLocallyFollowing, setLocalFollowing } from "@/lib/follows";
 import { useMe } from "@/lib/hooks";
 import type { ExploreCard } from "@/lib/types";
 import { themeOf } from "@/lib/themes";
@@ -19,17 +21,53 @@ export default function Explore() {
   const [q, setQ] = useState("");
   const [tag, setTag] = useState("");
   const { data: me } = useMe();
+  const localMe = getLocalMe();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const { data: cards, isLoading } = useQuery({
     queryKey: ["explore", q, tag],
-    queryFn: () => apiGet<ExploreCard[]>(`/explore?q=${encodeURIComponent(q)}&tag=${encodeURIComponent(tag)}`),
+    queryFn: async () => {
+      const result = await apiGet<ExploreCard[]>(`/explore?q=${encodeURIComponent(q)}&tag=${encodeURIComponent(tag)}`);
+      if (!localMe) return result;
+
+      return result.map((card) => {
+        const localFollowing = isLocallyFollowing(localMe.id, card.username);
+        return {
+          ...card,
+          following: card.following || localFollowing,
+          followers: card.followers + Number(localFollowing && !card.following),
+        };
+      });
+    },
   });
 
   const follow = useMutation({
-    mutationFn: (username: string) => apiPost<{ following: boolean }>(`/u/${username}/follow`, {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["explore"] }),
+    mutationFn: async (username: string) => {
+      try {
+        return await apiPost<{ following: boolean; followers?: number }>(`/u/${username}/follow`, {});
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 401 || !localMe) throw error;
+
+        const currentlyFollowing = isLocallyFollowing(localMe.id, username);
+        const following = !currentlyFollowing;
+        setLocalFollowing(localMe.id, username, following);
+        const card = cards?.find((item) => item.username === username);
+        return {
+          following,
+          followers: (card?.followers ?? 0) + Number(following) - Number(currentlyFollowing),
+        };
+      }
+    },
+    onSuccess: async (result, username) => {
+      if (localMe) setLocalFollowing(localMe.id, username, result.following);
+      queryClient.setQueryData<ExploreCard[]>(["explore", q, tag], (current) =>
+        current?.map((card) => card.username === username
+          ? { ...card, following: result.following, followers: result.followers ?? card.followers }
+          : card),
+      );
+      await queryClient.invalidateQueries({ queryKey: ["explore"] });
+    },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 401) {
         toast.error("Sign in to follow creators");
@@ -94,11 +132,40 @@ export default function Explore() {
           {cards?.map((card) => (
             <article
               key={card.username}
-              className="link-card overflow-hidden rounded-2xl border bg-card"
+              className="link-card relative isolate overflow-hidden rounded-2xl border bg-card"
               data-testid={`explore-card-${card.username}`}
             >
-              <div className="h-16" style={{ background: themeOf({ theme: card.theme }).accent }} />
-              <div className="p-5 pt-0">
+              <div
+                className="relative z-0 h-28 overflow-hidden"
+                style={{
+                  background: `radial-gradient(ellipse at 15% 0%, ${themeOf({ theme: card.theme }).accent}, transparent 65%), linear-gradient(135deg, ${themeOf({ theme: card.theme }).accent}66, #17151c)`,
+                }}
+                data-testid={`explore-banner-${card.username}`}
+              >
+                {card.cover_url && (
+                  /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(card.cover_url) ? (
+                    <video
+                      src={card.cover_url}
+                      className="absolute inset-0 z-0 size-full object-cover"
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <img
+                      src={card.cover_url}
+                      alt=""
+                      className="absolute inset-0 z-0 size-full object-cover"
+                      loading="lazy"
+                      onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    />
+                  )
+                )}
+                <div className="pointer-events-none absolute inset-0 z-0 bg-gradient-to-t from-black/25 to-transparent" />
+              </div>
+              <div className="relative z-10 p-5 pt-0">
                 <div className="-mt-8 flex items-end justify-between">
                   {card.avatar_url ? (
                     <img

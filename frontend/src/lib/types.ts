@@ -170,6 +170,7 @@ export interface ExploreCard {
   username: string;
   name: string;
   avatar_url: string;
+  cover_url: string;
   bio: string;
   interests: string[];
   followers: number;

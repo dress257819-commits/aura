@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { apiDelete, apiGet, apiPatch, apiPost, apiUpload, ApiError } from "@/lib/api";
 import { useMe } from "@/lib/hooks";
-import { PLATFORMS, platformDef } from "@/lib/platforms";
+import { PLATFORMS, platformDef, platformIconStyle } from "@/lib/platforms";
 import type { Link as LinkType } from "@/lib/types";
 
 interface FormState {
@@ -280,9 +280,7 @@ export default function DashboardLinks() {
                 </div>
                 <span
                   className="grid size-10 shrink-0 place-items-center rounded-xl border border-black/10"
-                  style={{
-                    background: def.iconBackground ?? `linear-gradient(135deg, ${def.color}, ${def.color}99)`,
-                  }}
+                  style={platformIconStyle(link.platform)}
                 >
                   <Icon size={18} color={def.iconColor} />
                 </span>
@@ -364,8 +362,8 @@ export default function DashboardLinks() {
                   <SelectContent>
                     {Object.entries(PLATFORMS).map(([key, def]) => (
                       <SelectItem key={key} value={key}>
-                        <span className="grid size-6 place-items-center rounded-md border border-black/10" style={{ backgroundColor: def.iconBackground ?? def.color }}>
-                          <def.icon size={14} color={def.iconColor} />
+                        <span className="grid size-6 place-items-center rounded-md border border-black/10" style={platformIconStyle(key)}>
+                          <def.icon size={14} />
                         </span>
                         {def.label}
                       </SelectItem>
@@ -528,7 +526,7 @@ export default function DashboardLinks() {
                 <div className="flex items-center gap-3 p-3">
                   <span
                     className="grid size-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-border/70"
-                    style={{ background: platformDef(form.platform).iconBackground ?? platformDef(form.platform).color }}
+                    style={platformIconStyle(form.platform)}
                   >
                     {(iconFilePreview || form.icon_url) ? (
                       <img src={iconFilePreview || form.icon_url} alt="" className="size-full object-cover" />

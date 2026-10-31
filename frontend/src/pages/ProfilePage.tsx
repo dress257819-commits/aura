@@ -4,6 +4,8 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { buttonVariants } from "@/components/ui/button";
 import { ProfileCanvas } from "@/components/profile/ProfileCanvas";
 import { apiGet, apiPost } from "@/lib/api";
+import { getLocalMe } from "@/lib/auth";
+import { isLocallyFollowing } from "@/lib/follows";
 import { shouldTrackView } from "@/lib/visitor";
 import type { ProfileBundle } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -13,7 +15,18 @@ export default function ProfilePage() {
 
   const { data: bundle, isLoading, isError, error } = useQuery({
     queryKey: ["profile", username],
-    queryFn: () => apiGet<ProfileBundle>(`/u/${username}`),
+    queryFn: async () => {
+      const bundle = await apiGet<ProfileBundle>(`/u/${username}`);
+      const localMe = getLocalMe();
+      if (!localMe || !username) return bundle;
+
+      const localFollowing = isLocallyFollowing(localMe.id, username);
+      return {
+        ...bundle,
+        following: bundle.following || localFollowing,
+        followers: bundle.followers + Number(localFollowing && !bundle.following),
+      };
+    },
     retry: false,
     enabled: !!username,
   });

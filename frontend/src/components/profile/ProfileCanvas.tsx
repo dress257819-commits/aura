@@ -16,10 +16,12 @@ import {
 } from "@/components/ui/dialog";
 import { ShareModal } from "@/components/profile/ShareModal";
 import { apiPost, ApiError } from "@/lib/api";
+import { getLocalMe } from "@/lib/auth";
+import { isLocallyFollowing, setLocalFollowing } from "@/lib/follows";
 import { useMe } from "@/lib/hooks";
 import { visitorId } from "@/lib/visitor";
 import { fontStack, themeOf } from "@/lib/themes";
-import { platformDef } from "@/lib/platforms";
+import { platformDef, platformIconStyle, platformOrbitIconStyle } from "@/lib/platforms";
 import type { Appearance, GalleryItem, ProfileBundle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -116,6 +118,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
   const { data: me } = useMe();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const localMe = getLocalMe();
 
   const appearance = appearanceOverride ?? profile.appearance;
   const theme = useMemo(() => themeOf(appearance), [appearance]);
@@ -128,6 +131,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
   const [msgName, setMsgName] = useState("");
   const [votedOption, setVotedOption] = useState<string | null>(null);
   const [hubLightMode, setHubLightMode] = useState(true);
+  const isFollowing = following || Boolean(localMe && isLocallyFollowing(localMe.id, profile.username));
 
   const socialLinks = links.filter((l) => platformDef(l.platform).social);
   const cardLinks = links.filter((l) => !platformDef(l.platform).social || l.description || l.thumbnail_url);
@@ -173,8 +177,31 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
   });
 
   const toggleFollow = useMutation({
-    mutationFn: () => apiPost<{ following: boolean; followers: number }>(`/u/${profile.username}/follow`, {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["profile", profile.username] }),
+    mutationFn: async () => {
+      try {
+        return await apiPost<{ following: boolean; followers: number }>(`/u/${profile.username}/follow`, {});
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.status !== 401 || !localMe) throw error;
+
+        const localFollowing = isLocallyFollowing(localMe.id, profile.username);
+        const nextFollowing = !localFollowing;
+        setLocalFollowing(localMe.id, profile.username, nextFollowing);
+        return {
+          following: nextFollowing,
+          followers: followers + Number(nextFollowing) - Number(localFollowing),
+        };
+      }
+    },
+    onSuccess: async (result) => {
+      if (localMe) setLocalFollowing(localMe.id, profile.username, result.following);
+      queryClient.setQueryData<ProfileBundle>(
+        ["profile", profile.username],
+        (current) => current
+          ? { ...current, following: result.following, followers: result.followers }
+          : current,
+      );
+      await queryClient.invalidateQueries({ queryKey: ["profile", profile.username] });
+    },
     onError: (err) => {
       if (err instanceof ApiError && err.status === 401) {
         toast.error("Sign in to follow creators");
@@ -302,9 +329,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                 <div className="min-w-0">
                   <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl" data-testid="profile-name">
                     {profile.name}
-                    {profile.plan !== "free" && (
-                      <BadgeCheck className="ml-1.5 inline size-5 align-middle" style={{ color: "#1d9bf0" }} aria-label={`${profile.plan} member`} />
-                    )}
+                    <BadgeCheck className="ml-1.5 inline size-5 align-middle" style={{ color: "#1d9bf0" }} aria-label="Verified creator" />
                   </h1>
                   {profile.bio && (
                     <p className="mt-1.5 max-w-2xl text-sm leading-6" style={{ color: theme.muted }} data-testid="profile-bio">
@@ -357,8 +382,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                     disabled={toggleFollow.isPending}
                     data-testid="follow-button"
                   >
-                    <Heart className="size-4" fill={following ? accent : "none"} />
-                    {following ? "Following" : "Follow"}
+                    <Heart className="size-4" fill={isFollowing ? accent : "none"} />
+                    {isFollowing ? "Following" : "Follow"}
                   </Button>
                 )}
                 <Button
@@ -437,7 +462,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                           else void apiPost(`/u/${profile.username}/links/${link.id}/click`, {}).catch(() => undefined);
                         }}
                         className="grid size-9 place-items-center rounded-xl border transition-transform hover:-translate-y-0.5"
-                        style={{ borderColor: theme.cardBorder, background: theme.bg, color: def.color }}
+                        style={{ ...platformIconStyle(link.platform), borderColor: theme.cardBorder }}
                       >
                         {link.icon_url ? <img src={link.icon_url} alt="" className="size-4 rounded object-cover" /> : <Icon size={16} />}
                       </a>
@@ -469,7 +494,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                           ) : link.icon_url ? (
                             <img src={link.icon_url} alt="" className="size-11 shrink-0 rounded-xl border object-cover" style={{ borderColor: theme.cardBorder }} />
                           ) : (
-                            <span className="grid size-10 shrink-0 place-items-center rounded-xl" style={{ background: `${accent}16`, color: accent }}>
+                            <span className="grid size-10 shrink-0 place-items-center rounded-xl" style={platformIconStyle(link.platform)}>
                               <Icon size={18} />
                             </span>
                           )}
@@ -691,16 +716,14 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               <div className={cn("min-w-0", preview ? "order-1 text-center" : "order-2 text-center sm:order-1 sm:text-left")}>
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-1.5 text-xs font-medium text-white/75">
                   <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_#34D399]" />
-                  Online · Always here
+                  Online
                 </span>
                 <h1 className={cn(
-                  "mt-5 break-words font-extrabold leading-[0.98] tracking-[-0.06em]",
+                  "mt-5 flex flex-wrap items-center gap-x-2 break-words font-extrabold leading-[0.98] tracking-[-0.06em]",
                   preview ? "text-2xl" : "text-4xl sm:text-5xl lg:text-[3.6rem]",
                 )} data-testid="profile-name">
                   <span className="text-white">{profile.name}</span>
-                  {profile.plan !== "free" && (
-                    <BadgeCheck className="ml-2 inline size-5 align-middle sm:size-6" style={{ color: "#1d9bf0" }} aria-label={`${profile.plan} member`} />
-                  )}
+                  <BadgeCheck className="size-5 shrink-0 align-middle sm:size-6" style={{ color: "#1d9bf0" }} aria-label="Verified creator" />
                 </h1>
                 <p className="mt-3 text-sm font-semibold text-white/85">
                   {profile.interests.slice(0, 3).join(" · ") || "Creator · Explorer · Dreamer"}
@@ -746,8 +769,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                       disabled={toggleFollow.isPending}
                       data-testid="follow-button"
                     >
-                      <Heart className="size-4" fill={following ? accent : "none"} />
-                      {following ? "Following" : "Follow"}
+                      <Heart className="size-4" fill={isFollowing ? accent : "none"} />
+                      {isFollowing ? "Following" : "Follow"}
                     </Button>
                   )}
                   <Button
@@ -813,8 +836,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                             if (preview) event.preventDefault();
                             else void apiPost(`/u/${profile.username}/links/${link.id}/click`, {}).catch(() => undefined);
                           }}
-                          className="creator-hub-orbit-icon grid size-10 place-items-center rounded-2xl border border-white/15 bg-[#111116]/90 shadow-[0_8px_24px_rgba(0,0,0,0.55)] backdrop-blur transition hover:scale-110 hover:border-violet-300/50 sm:size-11"
-                          style={{ color: def.color }}
+                          className="creator-hub-orbit-icon grid size-10 place-items-center rounded-2xl border border-white/15 shadow-[0_8px_24px_rgba(0,0,0,0.55)] backdrop-blur transition hover:scale-110 hover:border-violet-300/50 sm:size-11"
+                          style={platformOrbitIconStyle(hubLightMode)}
                         >
                           <Icon size={20} />
                         </a>
@@ -875,8 +898,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                         if (preview) event.preventDefault();
                         else void apiPost(`/u/${profile.username}/links/${link.id}/click`, {}).catch(() => undefined);
                       }}
-                      className="grid size-10 place-items-center rounded-xl border border-white/10 bg-white/[0.045] transition-colors hover:border-violet-300/40 hover:bg-violet-400/10"
-                      style={{ color: def.color }}
+                      className="grid size-10 place-items-center rounded-xl border border-white/10 transition-colors hover:border-violet-300/40"
+                      style={platformIconStyle(link.platform)}
                     >
                       <Icon size={18} />
                     </a>
@@ -903,7 +926,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                     {link.icon_url ? (
                       <img src={link.icon_url} alt="" className="size-9 shrink-0 rounded-xl object-cover" />
                     ) : (
-                      <span className="grid size-9 shrink-0 place-items-center rounded-xl text-white" style={{ background: `linear-gradient(135deg, ${accent}, #C056E8)` }}>
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl" style={platformIconStyle(link.platform)}>
                         <Icon size={17} />
                       </span>
                     )}
@@ -1073,7 +1096,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
             </span>
             {socialLinks.length > 0 && (
               <span className="flex items-center gap-2">
-                {socialLinks.slice(0, 6).map((link) => {
+                {socialLinks.slice(0, 5).map((link) => {
                   const Icon = platformDef(link.platform).icon;
                   return (
                     <a
@@ -1083,7 +1106,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                       rel="noopener noreferrer"
                       aria-label={`${platformDef(link.platform).label} — ${link.title}`}
                       onClick={(event) => preview && event.preventDefault()}
-                      className="grid size-8 place-items-center rounded-full border border-white/10 bg-white/[0.04] hover:text-violet-200"
+                      className="grid size-8 place-items-center rounded-full border border-white/10 hover:brightness-110"
+                      style={platformIconStyle(link.platform)}
                     >
                       <Icon size={15} />
                     </a>
@@ -1186,13 +1210,11 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
             </div>
           )}
           <h1
-            className="mt-3 flex items-center gap-1.5 text-2xl font-bold tracking-tight"
+            className="mt-3 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight"
             data-testid="profile-name"
           >
             {profile.name}
-            {profile.plan !== "free" && (
-              <BadgeCheck className="size-5" style={{ color: "#1d9bf0" }} aria-label={`${profile.plan} member`} />
-            )}
+            <BadgeCheck className="size-5 shrink-0" style={{ color: "#1d9bf0" }} aria-label="Verified creator" />
           </h1>
           <p className="font-mono text-sm" style={{ color: theme.muted }} data-testid="profile-username">
             @{profile.username}
@@ -1248,8 +1270,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               disabled={toggleFollow.isPending}
               data-testid="follow-button"
             >
-              <Heart className="size-4" fill={following ? accent : "none"} />
-              {following ? "Following" : "Follow"}
+              <Heart className="size-4" fill={isFollowing ? accent : "none"} />
+              {isFollowing ? "Following" : "Follow"}
             </Button>
           )}
           <Button
@@ -1286,7 +1308,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                     else void apiPost(`/u/${profile.username}/links/${link.id}/click`, {}).catch(() => undefined);
                   }}
                   className="link-card grid size-10 place-items-center rounded-full border"
-                  style={{ ...cardStyle, color: def.color }}
+                  style={{ ...cardStyle, ...platformIconStyle(link.platform) }}
                   data-testid={`social-link-${link.platform}`}
                 >
                   {link.icon_url ? (
@@ -1332,12 +1354,12 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                     />
                   ) : (
                   <span
-                    className="grid size-11 shrink-0 place-items-center rounded-xl text-white"
-                    style={{ background: `linear-gradient(135deg, ${accent}, ${accent}99)` }}
+                    className="grid size-11 shrink-0 place-items-center rounded-xl"
+                    style={platformIconStyle(link.platform)}
                   >
                     {(() => {
                       const Icon = platformDef(link.platform).icon;
-                      return <Icon size={20} color="#fff" />;
+                      return <Icon size={20} />;
                     })()}
                   </span>
                   )}

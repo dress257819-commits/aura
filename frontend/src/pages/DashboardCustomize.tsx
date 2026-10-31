@@ -40,6 +40,7 @@ const CARD_STYLES = [
   { key: "outline", name: "Outline", description: "A bold creator finish", plan: "creator" },
 ];
 const ACCENT_PRESETS = ["#8B5CF6", "#EC4899", "#22C55E", "#0EA5E9", "#F97316", "#EAB308"];
+const INTEREST_OPTIONS = ["Design", "Tech", "Music", "Gaming", "Fitness", "Photography", "Art"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
@@ -72,6 +73,20 @@ interface PreviewData {
 
 function isUnlocked(plan: string, requiredPlan?: string) {
   return !requiredPlan || (PLAN_RANK[plan] ?? 0) >= (PLAN_RANK[requiredPlan] ?? 0);
+}
+
+function parseInterests(value: string): string[] {
+  const seen = new Set<string>();
+  return value.split(",").map((interest) => interest.trim()).filter((interest) => {
+    const key = interest.toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function isSuggestedInterest(interest: string): boolean {
+  return INTEREST_OPTIONS.some((option) => option.toLowerCase() === interest.toLowerCase());
 }
 
 function draftFromProfile(profile: MeProfile): ProfileDraft {
@@ -286,6 +301,7 @@ export default function DashboardCustomize() {
   const [availabilityUsername, setAvailabilityUsername] = useState("");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<string>();
+  const [customInterestsOpen, setCustomInterestsOpen] = useState(false);
 
   useEffect(() => {
     if (me?.appearance) setAppearance(me.appearance);
@@ -370,7 +386,7 @@ export default function DashboardCustomize() {
         username: draft.username.trim().toLowerCase(),
         bio: draft.bio,
         location: draft.location,
-        interests: draft.interests.split(",").map((interest) => interest.trim()).filter(Boolean).slice(0, 8),
+        interests: parseInterests(draft.interests).slice(0, 8),
         daily_question: draft.daily_question,
         avatar_url: avatar.url,
         cover_url: cover.url,
@@ -407,6 +423,37 @@ export default function DashboardCustomize() {
   const selectedTheme = appearance ? PROFILE_THEMES[appearance.theme] : undefined;
   const avatarPreview = useFilePreview(profileDraft?.avatar_file ?? null);
   const coverPreview = useFilePreview(profileDraft?.cover_file ?? null);
+  const draftInterests = profileDraft ? parseInterests(profileDraft.interests) : [];
+  const selectedSuggestedInterests = draftInterests.filter(isSuggestedInterest);
+  const customInterestValues = draftInterests.filter((interest) => !isSuggestedInterest(interest));
+  const customInterestInputOpen = customInterestsOpen || customInterestValues.length > 0;
+  const updateSuggestedInterest = (interest: string) => {
+    if (!profileDraft) return;
+    const selected = selectedSuggestedInterests.some(
+      (current) => current.toLowerCase() === interest.toLowerCase(),
+    );
+    if (!selected && draftInterests.length >= 8) {
+      toast.error("Choose up to 8 interests");
+      return;
+    }
+
+    const next = selected
+      ? draftInterests.filter((current) => current.toLowerCase() !== interest.toLowerCase())
+      : [...draftInterests, interest];
+    setProfileDraft({ ...profileDraft, interests: next.join(", ") });
+  };
+  const updateCustomInterests = (value: string) => {
+    if (!profileDraft) return;
+    const customValues = parseInterests(value).filter((interest) => !isSuggestedInterest(interest));
+    const maxCustom = Math.max(0, 8 - selectedSuggestedInterests.length);
+    if (customValues.length > maxCustom) {
+      toast.error(`You can add up to ${maxCustom} more custom ${maxCustom === 1 ? "interest" : "interests"}`);
+    }
+    setProfileDraft({
+      ...profileDraft,
+      interests: [...selectedSuggestedInterests, ...customValues.slice(0, maxCustom)].join(", "),
+    });
+  };
   const hasProfileChanges = !!me && !!profileDraft && (
     profileDraft.username !== me.username
     || profileDraft.name !== me.name
@@ -433,7 +480,7 @@ export default function DashboardCustomize() {
           name: profileDraft.name || me?.name || "",
           bio: profileDraft.bio,
           location: profileDraft.location,
-          interests: profileDraft.interests.split(",").map((interest) => interest.trim()).filter(Boolean).slice(0, 8),
+          interests: parseInterests(profileDraft.interests).slice(0, 8),
           daily_question: profileDraft.daily_question,
           avatar_url: avatarPreview || profileDraft.avatar_url,
           cover_url: coverPreview || profileDraft.cover_url,
@@ -566,18 +613,70 @@ export default function DashboardCustomize() {
                       />
                       <p className="text-right text-xs text-muted-foreground">{profileDraft.bio.length}/400</p>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="customize-interests">Interests</Label>
-                      <Input
-                        id="customize-interests"
-                        value={profileDraft.interests}
-                        onChange={(event) => setProfileDraft({ ...profileDraft, interests: event.target.value })}
-                        placeholder="Design, music, coffee"
-                        maxLength={220}
-                        data-testid="customize-interests-input"
-                      />
-                      <p className="text-xs text-muted-foreground">Separate up to 8 interests with commas.</p>
-                    </div>
+                    <fieldset className="space-y-2">
+                      <legend className="text-sm font-medium">Interests</legend>
+                      <div className="flex flex-wrap gap-2" data-testid="customize-interest-options">
+                        {INTEREST_OPTIONS.map((interest) => {
+                          const selected = selectedSuggestedInterests.some(
+                            (current) => current.toLowerCase() === interest.toLowerCase(),
+                          );
+                          return (
+                            <button
+                              key={interest}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => updateSuggestedInterest(interest)}
+                              className={cn(
+                                "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                                selected
+                                  ? "border-primary bg-primary text-primary-foreground"
+                                  : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                              )}
+                              data-testid={`customize-interest-${interest.toLowerCase()}`}
+                            >
+                              {interest}
+                            </button>
+                          );
+                        })}
+                        <button
+                          type="button"
+                          aria-pressed={customInterestInputOpen}
+                          onClick={() => {
+                            if (customInterestInputOpen) {
+                              setProfileDraft({
+                                ...profileDraft,
+                                interests: selectedSuggestedInterests.join(", "),
+                              });
+                              setCustomInterestsOpen(false);
+                            } else {
+                              setCustomInterestsOpen(true);
+                            }
+                          }}
+                          className={cn(
+                            "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                            customInterestInputOpen
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-border bg-background text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                          )}
+                          data-testid="customize-interest-custom"
+                        >
+                          Custom
+                        </button>
+                      </div>
+                      {customInterestInputOpen && (
+                        <Input
+                          id="customize-interests"
+                          value={customInterestValues.join(", ")}
+                          onChange={(event) => updateCustomInterests(event.target.value)}
+                          placeholder="Add your own interests"
+                          maxLength={220}
+                          data-testid="customize-interests-input"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {draftInterests.length} of 8 selected. Choose from the list or add custom interests.
+                      </p>
+                    </fieldset>
                     <div className="space-y-2">
                       <Label htmlFor="customize-question">Question for visitors <span className="font-normal text-muted-foreground">· optional</span></Label>
                       <Input

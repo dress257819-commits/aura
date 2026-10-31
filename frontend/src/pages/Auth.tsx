@@ -214,7 +214,7 @@ export default function Auth() {
             <Button
               type="button"
               variant="outline"
-              className="h-11 w-full rounded-xl bg-background/70 font-medium"
+              className="h-11 w-full cursor-pointer rounded-xl bg-background/70 font-medium"
               onClick={() => window.location.assign("/api/auth/google/start")}
               data-testid="google-auth-button"
             >

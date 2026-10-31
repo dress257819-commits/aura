@@ -51,6 +51,7 @@ async def explore(
             "username": d["username"],
             "name": d.get("name", ""),
             "avatar_url": d.get("avatar_url", ""),
+            "cover_url": d.get("cover_url", ""),
             "bio": d.get("bio", "")[:140],
             "interests": d.get("interests", [])[:4],
             "followers": followers,
