@@ -1,0 +1,224 @@
+{
+  "theme": "dark-first with seamless light mode switch (deep obsidian #0D0F12 base with iridescent electric violet and cyan accents for Gen-Z creator flair)",
+  "design_archetype": "The Editorial Future + Swiss Bento Fusion (High energy creator canvas, glassmorphic floating widgets, tactical data surfaces, 9:16 story-ready canvas aesthetic)",
+  "typography": {
+    "font_family_heading": "Plus Jakarta Sans Variable, sans-serif",
+    "font_family_body": "DM Sans Variable, sans-serif",
+    "font_family_mono": "Geist Mono Variable, monospace",
+    "scale_px": {
+      "display": 56,
+      "h1": 44,
+      "h2": 32,
+      "h3": 24,
+      "body": 16,
+      "caption": 14
+    },
+    "rules": {
+      "headings": "font-bold tracking-tight text-white dark:text-white text-zinc-900",
+      "body": "leading-relaxed tracking-normal font-normal",
+      "labels": "text-xs font-semibold tracking-wider uppercase font-mono"
+    }
+  },
+  "colors": {
+    "accent": "#6366F1",
+    "on_accent": "#FFFFFF",
+    "secondary_accent": "#EC4899",
+    "surfaces": [
+      {
+        "name": "page_dark",
+        "kind": "solid",
+        "bg": "#0B0D11",
+        "on_bg": "#F3F4F6",
+        "on_bg_muted": "#9CA3AF",
+        "roles": {
+          "link": "#818CF8",
+          "error": "#F87171",
+          "success": "#34D399",
+          "warning": "#FBBF24"
+        }
+      },
+      {
+        "name": "panel_dark",
+        "kind": "solid",
+        "bg": "#131720",
+        "on_bg": "#F9FAFB",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "border": "#1E293B",
+          "hover_bg": "#1E2433"
+        }
+      },
+      {
+        "name": "card_bento_dark",
+        "kind": "solid",
+        "bg": "#181E2B",
+        "on_bg": "#FFFFFF",
+        "on_bg_muted": "#A1A1AA",
+        "roles": {
+          "badge": "#312E81",
+          "badge_text": "#C7D2FE"
+        }
+      },
+      {
+        "name": "hero_glass_dark",
+        "kind": "glass",
+        "contrast_against": "#0B0D11",
+        "guarantee": "backdrop-blur-xl bg-slate-950/75 border border-white/10 shadow-2xl",
+        "on_bg": "#FFFFFF",
+        "on_bg_muted": "#CBD5E1",
+        "roles": {
+          "link": "#A5B4FC",
+          "error": "#FCA5A5",
+          "success": "#6EE7B7"
+        }
+      },
+      {
+        "name": "page_light",
+        "kind": "solid",
+        "bg": "#F8FAFC",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569",
+        "roles": {
+          "link": "#4F46E5",
+          "error": "#DC2626",
+          "success": "#059669",
+          "warning": "#D97706"
+        }
+      },
+      {
+        "name": "panel_light",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "border": "#E2E8F0",
+          "hover_bg": "#F1F5F9"
+        }
+      },
+      {
+        "name": "story_canvas_916",
+        "kind": "gradient",
+        "contrast_against": "#180B2B",
+        "guarantee": "scrim: linear-gradient(135deg, rgba(15,10,35,0.95), rgba(45,15,65,0.92))",
+        "on_bg": "#FFFFFF",
+        "on_bg_muted": "#E9D5FF",
+        "roles": {
+          "tag": "#F472B6",
+          "highlight": "#FACC15"
+        }
+      }
+    ]
+  },
+  "entry_surfaces": {
+    "/": "split hero — value prop + interactive live 3D phone mockup preview left, discoverable creator Bento stream right",
+    "/login": "branded split auth — animated dynamic profile card preview left, email/social sign-in form right",
+    "/signup": "branded split auth — interactive creator perk showcase left, fast registration form right",
+    "/u/:username": "dark creator portfolio canvas — typographic introduction and floating social links around the profile image, with compact about, anonymous ask, universe, gallery, and profile-detail panels",
+    "/dashboard": "tactical Bento control panel — multi-metric creator overview, quick actions, link order manager, live phone frame sync",
+    "/dashboard/links": "drag-and-drop link manager — live preview phone simulator, card customizer with animated badges & thumbnail picker",
+    "/dashboard/messages": "anonymous inbox & moderation station — filterable feed, one-click answer, and Send-to-Story Studio button",
+    "/dashboard/story-studio": "interactive 9:16 story studio with two modes (invite anonymous messages with a direct profile-link sticker, or publish a question-and-answer story), six visual themes, face-focused creator portrait, instant PNG export, and Instagram sharing",
+    "/dashboard/analytics": "creator intelligence dashboard — view breakdown by device/country, CTR heatmaps, anonymous question sentiment, link rank chart",
+    "/dashboard/customize": "theme design engine — preset themes (Midnight Aurora, Cyber Tokyo, Clean Minimal, Matcha Warmth, Neo-Brutalist), font picker, custom background upload, glassmorphism slider",
+    "/pricing": "transparent 3-tier creator pricing grid — Free, Pro Creator ($9/mo), Agency/Studio ($29/mo) with simulated seamless upgrade modals",
+    "/explore": "trending creator discovery feed — search by tags (Design, Tech, Music, Gaming, Fitness), preview mini-bento cards, follow/favorite"
+  },
+  "grids_and_layouts": {
+    "public_profile": "responsive dark portfolio canvas with a 12-column desktop bento grid and a stacked mobile layout",
+    "dashboard_grid": "grid grid-cols-1 lg:grid-cols-12 gap-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto",
+    "dashboard_sidebar": "lg:col-span-3 space-y-4",
+    "dashboard_main": "lg:col-span-9 space-y-6",
+    "story_studio_layout": "grid grid-cols-1 lg:grid-cols-12 gap-8 items-start",
+    "story_canvas_preview": "lg:col-span-6 flex justify-center sticky top-24",
+    "story_controls_panel": "lg:col-span-6 space-y-6 bg-slate-900/60 p-6 rounded-2xl border border-white/10"
+  },
+  "motion": {
+    "reduced_motion_policy": "prefers-reduced-motion respected via framer-motion/motion hooks",
+    "transitions": {
+      "card_hover": "transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:shadow-indigo-500/10",
+      "button_press": "active:scale-[0.98] transition-transform duration-100",
+      "drawer_spring": "damping: 25, stiffness: 300",
+      "modal_fade": "duration: 0.2, ease: 'easeOut'"
+    }
+  },
+  "accessibility": {
+    "contrast_standard": "WCAG AA (minimum 4.5:1 for all text & UI controls)",
+    "data_testids_required": true,
+    "keyboard_nav": "all interactive widgets, modals, and polls must be fully reachable via Tab/Enter/Space",
+    "screen_reader": "aria-live for poll vote updates and new message toasts"
+  },
+  "image_urls": {
+    "avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwxfHxjcmVhdG9yJTIwcG9ydHJhaXQlMjBnZW4lMjB6JTIwYWVzdGhldGljfGVufDB8fHx8MTc5MzQxNzMzM3ww&ixlib=rb-4.1.0&q=85",
+        "category": "creator_avatar_primary",
+        "description": "Featured creator portrait: Maya Chen, Digital Designer & Creative Coder"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1629747490241-624f07d70e1e?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHwyfHxjcmVhdG9yJTIwcG9ydHJhaXQlMjBnZW4lMjB6JTIwYWVzdGhldGljfGVufDB8fHx8MTc5MzQxNzMzM3ww&ixlib=rb-4.1.0&q=85",
+        "category": "creator_avatar_secondary",
+        "description": "Featured creator portrait: Liam Vance, Music Producer & Tech Explorer"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1529068755536-a5ade0dcb4e8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjd8MHwxfHNlYXJjaHw0fHxjcmVhdG9yJTIwcG9ydHJhaXQlMjBnZW4lMjB6JTIwYWVzdGhldGljfGVufDB8fHx8MTc5MzQxNzMzM3ww&ixlib=rb-4.1.0&q=85",
+        "category": "creator_avatar_tertiary",
+        "description": "Featured creator portrait: Alex Rivera, Indie Game Developer"
+      }
+    ],
+    "banners": [
+      {
+        "url": "https://images.unsplash.com/photo-1597407068889-782ba11fb621?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHwyfHxhZXN0aGV0aWMlMjBsYW5kc2NhcGUlMjBjb3ZlciUyMG1vb2R5JTIwYW1iaWVudHxlbnwwfHx8fDE3OTM0MTczMzN8MA&ixlib=rb-4.1.0&q=85",
+        "category": "profile_cover_moody",
+        "description": "Atmospheric mist mountain cover banner for profiles"
+      },
+      {
+        "url": "https://images.unsplash.com/photo-1718293009403-164052a4c92c?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzZ8MHwxfHNlYXJjaHw0fHxhZXN0aGV0aWMlMjBsYW5kc2NhcGUlMjBjb3ZlciUyMG1vb2R5JTIwYW1iaWVudHxlbnwwfHx8fDE3OTM0MTczMzN8MA&ixlib=rb-4.1.0&q=85",
+        "category": "profile_cover_botanical",
+        "description": "Warm cinematic aesthetic leaf foliage banner"
+      }
+    ]
+  },
+  "component_hierarchy": {
+    "public_profile": [
+      "@/components/profile/ProfileHeader.tsx",
+      "@/components/profile/SocialLinksRow.tsx",
+      "@/components/profile/BentoLinkCard.tsx",
+      "@/components/profile/AnonymousMessageBox.tsx",
+      "@/components/profile/PublicQASection.tsx",
+      "@/components/profile/InteractivePollWidget.tsx",
+      "@/components/profile/CreatorGalleryWidget.tsx",
+      "@/components/profile/MusicPlayerWidget.tsx",
+      "@/components/profile/AIChatbotDrawer.tsx",
+      "@/components/profile/ProfileShareModal.tsx"
+    ],
+    "dashboard": [
+      "@/components/dashboard/DashboardHeader.tsx",
+      "@/components/dashboard/DashboardNav.tsx",
+      "@/components/dashboard/OverviewMetrics.tsx",
+      "@/components/dashboard/LivePhoneSimulator.tsx",
+      "@/components/dashboard/LinksManager.tsx",
+      "@/components/dashboard/MessageInbox.tsx",
+      "@/components/dashboard/StoryStudioCanvas.tsx",
+      "@/components/dashboard/ChatbotSettingsPanel.tsx",
+      "@/components/dashboard/ThemeCustomizer.tsx",
+      "@/components/dashboard/AnalyticsCharts.tsx"
+    ],
+    "shared": [
+      "@/components/shared/ThemeToggle.tsx",
+      "@/components/shared/Navbar.tsx",
+      "@/components/shared/Footer.tsx",
+      "@/components/shared/UpgradeModal.tsx"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "1. Base UI components from @/components/ui (button, input, textarea, dialog, sheet, tabs, dropdown-menu, select, badge, card, popover, sonner) must be heavily styled to match the dark/light Mosaic design aesthetic.",
+    "2. For Social icons, use `@icons-pack/react-simple-icons` (SiInstagram, SiTiktok, SiYoutube, SiX, SiGithub, SiDiscord, SiSpotify, SiLinkedin, SiTwitch) with fallback to Lucide glyphs.",
+    "3. Public profile (/u/:username) must render seamlessly both standalone and inside the Dashboard's Live Phone Simulator frame.",
+    "4. Story Studio must feature direct-link invite and question-answer templates, six selectable visual themes, a face-focused creator portrait, a 9:16 preview/export, copyable profile-link sticker guidance, and client-side PNG export.",
+    "5. Anonymous messages must have toggleable owner moderation (publish to Public Q&A wall, reply privately, or create Story graphic).",
+    "6. AI Chatbot on profiles must use emergentintegrations /api/ai/chat endpoint with strict prompt grounding on the user profile facts so it answers accurately without hallucinating.",
+    "7. Include pre-populated vibrant demo profiles for instant exploration (e.g., /u/maya, /u/liam, /u/alex) with active polls, answered Q&As, and sample anonymous messages.",
+    "8. Ensure every button, input, toggle, and link contains an explicit `data-testid` attribute for testing automation."
+  ]
+}
