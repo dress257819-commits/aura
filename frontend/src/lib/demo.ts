@@ -20,6 +20,7 @@ export const DEMO_ANALYTICS_SUMMARY: AnalyticsSummary = {
   ],
   followers: 1842,
   messages_pending: 0,
+  chat_messages: 0,
 };
 
 export const DEMO_PROFILE_BUNDLE: ProfileBundle = {

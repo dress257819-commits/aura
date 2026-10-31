@@ -155,6 +155,7 @@ export interface AnalyticsSummary {
   top_links: TopLink[];
   followers: number;
   messages_pending: number;
+  chat_messages: number;
 }
 
 export interface PlanInfo {
