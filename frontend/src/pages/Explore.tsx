@@ -167,17 +167,17 @@ export default function Explore() {
               </div>
               <div className="relative z-10 p-5 pt-0">
                 <div className="-mt-8 flex items-end justify-between">
-                  {card.avatar_url ? (
-                    <img
-                      src={card.avatar_url}
-                      alt={card.name}
-                      className="size-16 rounded-full object-cover ring-4 ring-card"
-                    />
-                  ) : (
-                    <span className="grid size-16 place-items-center rounded-full bg-primary/15 font-heading text-xl font-bold text-primary ring-4 ring-card">
-                      {card.name.charAt(0)}
-                    </span>
-                  )}
+                  <span className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-primary/15 font-heading text-xl font-bold text-primary ring-4 ring-card">
+                    <span aria-hidden="true">{card.name.charAt(0).toUpperCase()}</span>
+                    {card.avatar_url && (
+                      <img
+                        src={card.avatar_url}
+                        alt=""
+                        className="absolute inset-0 size-full rounded-full object-cover"
+                        onError={(event) => { event.currentTarget.style.display = "none"; }}
+                      />
+                    )}
+                  </span>
                   {card.plan !== "free" && (
                     <Badge variant="secondary" className="mb-1 gap-1 capitalize">
                       <BadgeCheck className="size-3.5" aria-hidden="true" /> {card.plan}

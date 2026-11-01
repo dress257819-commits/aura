@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import secrets
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -37,8 +37,28 @@ GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 
+def _is_local_url(url: str) -> bool:
+    return urlsplit(url).hostname in {"localhost", "127.0.0.1", "::1"}
+
+
+def _google_frontend_url() -> str:
+    configured_url = os.environ.get("GOOGLE_FRONTEND_URL")
+    render_url = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
+    if render_url and (not configured_url or _is_local_url(configured_url)):
+        return f"{render_url}/auth"
+    return configured_url or "http://localhost:3000/auth"
+
+
+def _google_redirect_uri() -> str:
+    configured_uri = os.environ.get("GOOGLE_REDIRECT_URI")
+    render_url = os.environ.get("RENDER_EXTERNAL_URL", "").rstrip("/")
+    if render_url and (not configured_uri or _is_local_url(configured_uri)):
+        return f"{render_url}/api/auth/google/callback"
+    return configured_uri or "http://localhost:8001/api/auth/google/callback"
+
+
 def _google_redirect(status: str) -> RedirectResponse:
-    frontend_url = os.environ.get("GOOGLE_FRONTEND_URL", "http://localhost:3000/auth")
+    frontend_url = _google_frontend_url()
     separator = "&" if "?" in frontend_url else "?"
     return RedirectResponse(f"{frontend_url}{separator}{urlencode({'google': status})}", status_code=303)
 
@@ -146,7 +166,7 @@ async def me(user: User = Depends(get_current_user)):
 @router.get("/google/start", include_in_schema=False)
 async def google_start():
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
-    redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI")
+    redirect_uri = _google_redirect_uri()
     if not client_id or not redirect_uri:
         logger.error("Google sign-in is unavailable: GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI is missing")
         return _google_redirect("not_configured")
@@ -192,7 +212,7 @@ async def google_callback(
 
     client_id = os.environ.get("GOOGLE_CLIENT_ID")
     client_secret = os.environ.get("GOOGLE_CLIENT_SECRET")
-    redirect_uri = os.environ.get("GOOGLE_REDIRECT_URI")
+    redirect_uri = _google_redirect_uri()
     if not client_id or not client_secret or not redirect_uri:
         logger.error("Google sign-in callback received without complete OAuth configuration")
         response = _google_redirect("not_configured")

@@ -99,9 +99,14 @@ FastAPI, async throughout. `python` is the app venv interpreter
   3. Open the Render service URL and check `/api/health`. Create an account and
      try profile editing, uploads, links, messages, and the dashboard.
   4. Optional integrations need secrets added in the Render dashboard, never
-     committed: configure Google OAuth with the service URL plus
-     `/api/auth/google/callback`, set `GOOGLE_FRONTEND_URL` to the service URL
-     plus `/auth`, and set `FRONTEND_URL` and `BACKEND_PUBLIC_URL` to the service URL.
+     committed. For Google sign-in, set `GOOGLE_CLIENT_ID` and
+     `GOOGLE_CLIENT_SECRET` in the service Environment. In Google Cloud Console,
+     add `https://YOUR-SERVICE.onrender.com` as an authorized JavaScript origin
+     and `https://YOUR-SERVICE.onrender.com/api/auth/google/callback` as an
+     authorized redirect URI. Set `GOOGLE_REDIRECT_URI` to that callback and
+     `GOOGLE_FRONTEND_URL` to `https://YOUR-SERVICE.onrender.com/auth` in Render.
+     The app falls back to Render's public domain if these URL variables still
+     contain localhost. Set `FRONTEND_URL` and `BACKEND_PUBLIC_URL` to the service URL.
      AI chat is temporarily unavailable on this public deployment because its
      Emergent-only Python integration is not published on the package index used
      by Render. Add Stripe/eSewa/Khalti merchant

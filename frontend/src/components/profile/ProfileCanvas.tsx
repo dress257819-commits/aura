@@ -923,7 +923,6 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                 </div>
               </div>
             </div>
-            <ProfileBanner profile={profile} className={preview ? "mt-1" : "lg:max-w-xl"} />
           </section>
 
           <section className={cn("rounded-[1.75rem] border p-4 backdrop-blur-xl sm:p-6", !preview && "lg:col-span-4")} style={hubPanelStyle} data-testid="creator-hub-about">
