@@ -877,7 +877,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                     <img
                       src={profile.avatar_url}
                       alt={profile.name}
-                      className="absolute inset-y-0 left-1/2 h-full w-[86%] object-contain grayscale [mask-image:linear-gradient(to_bottom,#000_82%,transparent)]"
+                      className="absolute inset-y-0 left-1/2 h-full w-[86%] object-contain grayscale [mask-image:linear-gradient(to_bottom,#000_68%,rgba(0,0,0,0.82)_82%,transparent_100%)] drop-shadow-[0_20px_28px_rgba(27,20,40,0.22)]"
                       style={{ transform: "translateX(-50%) translateZ(0)" }}
                       data-testid="profile-avatar"
                     />
@@ -928,8 +928,16 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
           <section className={cn("rounded-[1.75rem] border p-4 backdrop-blur-xl sm:p-6", !preview && "lg:col-span-4")} style={hubPanelStyle} data-testid="creator-hub-about">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-heading text-lg font-bold">About me</h2>
-              <span className="inline-flex items-center gap-1 rounded-full border border-sky-300/20 bg-sky-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
-                <BadgeCheck className="size-3" aria-hidden="true" /> Verified
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide",
+                  hubLightMode
+                    ? "border-sky-800/20 bg-sky-100 text-sky-900"
+                    : "border-sky-300/20 bg-sky-400/10 text-sky-200",
+                )}
+              >
+                <BadgeCheck className="size-3" aria-hidden="true" />
+                {profile.plan === "creator" ? "Creator" : profile.plan === "pro" ? "Pro" : "Member"}
               </span>
             </div>
             <p className="mt-4 text-sm leading-6 text-white/65">

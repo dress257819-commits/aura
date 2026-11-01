@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Check, ExternalLink, Lock, Paintbrush, Upload, X,
+  Check, ExternalLink, LoaderCircle, Lock, Paintbrush, Upload, X,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PhoneFrame } from "@/components/shared/PhoneFrame";
@@ -18,6 +18,7 @@ import { useMe } from "@/lib/hooks";
 import { FONT_OPTIONS, PROFILE_THEMES } from "@/lib/themes";
 import type { Appearance, ChatbotSettings, Link, MeProfile, ProfileBundle } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { removePhotoBackground, type BackgroundRemovalProgress } from "@/lib/remove-photo-background";
 
 const CARD_STYLES = [
   { key: "rounded", name: "Rounded", description: "Clean and familiar", plan: "free" },
@@ -137,6 +138,7 @@ function ProfileMediaField({
   onImageUrlChange: (value: string) => void;
   onFileChange: (file: File | null) => void;
 }) {
+  const [backgroundRemoval, setBackgroundRemoval] = useState<BackgroundRemovalProgress | null>(null);
   const localPreview = useFilePreview(file);
   const src = localPreview || imageUrl;
 
@@ -184,7 +186,7 @@ function ProfileMediaField({
                   key={src}
                   src={src}
                   alt="Profile photo preview"
-                  className="size-full object-cover"
+                  className="size-full object-contain"
                   onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
                 />
               ) : (
@@ -200,16 +202,23 @@ function ProfileMediaField({
         <div className="space-y-3 border-t border-border/70 bg-card p-3">
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:border-primary/40 hover:text-primary">
-              <Upload className="size-3.5" />
-              {file ? "Choose another" : kind === "cover" ? "Upload image or video" : "Upload image"}
+              {backgroundRemoval
+                ? <LoaderCircle className="size-3.5 animate-spin" />
+                : <Upload className="size-3.5" />}
+              {backgroundRemoval
+                ? backgroundRemoval.stage === "loading"
+                  ? `Loading background remover${backgroundRemoval.percent === undefined ? "…" : ` ${backgroundRemoval.percent}%`}`
+                  : "Removing background…"
+                : file ? "Choose another" : kind === "cover" ? "Upload image or video" : "Upload image"}
               <input
                 type="file"
                 accept={kind === "cover"
                   ? "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v"
                   : "image/jpeg,image/png,image/gif,image/webp"}
                 className="sr-only"
+                disabled={!!backgroundRemoval}
                 onClick={(event) => { event.currentTarget.value = ""; }}
-                onChange={(event) => {
+                onChange={async (event) => {
                   const selected = event.currentTarget.files?.[0];
                   if (!selected) return;
                   const isVideo = kind === "cover" && (
@@ -226,8 +235,30 @@ function ProfileMediaField({
                     toast.error(`Files must be ${isVideo ? 25 : 5} MB or smaller`);
                     return;
                   }
-                  onImageUrlChange("");
-                  onFileChange(selected);
+                  if (kind !== "avatar" || selected.type === "image/gif") {
+                    if (kind === "avatar" && selected.type === "image/gif") {
+                      toast.info("Animated GIFs keep their background. Use a still photo for automatic removal.");
+                    }
+                    onImageUrlChange("");
+                    onFileChange(selected);
+                    return;
+                  }
+
+                  setBackgroundRemoval({ stage: "loading" });
+                  try {
+                    const cutout = await removePhotoBackground(selected, setBackgroundRemoval);
+                    onImageUrlChange("");
+                    onFileChange(cutout);
+                    toast.success("Background removed on your device");
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? `Couldn't remove the background: ${error.message}`
+                        : "Couldn't remove the background. Please try another photo.",
+                    );
+                  } finally {
+                    setBackgroundRemoval(null);
+                  }
                 }}
               />
             </label>
@@ -236,6 +267,7 @@ function ProfileMediaField({
                 type="button"
                 size="sm"
                 variant="ghost"
+                disabled={!!backgroundRemoval}
                 onClick={() => {
                   onImageUrlChange("");
                   onFileChange(null);
@@ -259,7 +291,9 @@ function ProfileMediaField({
             aria-label={`${label} image URL`}
           />
           <p className="text-xs text-muted-foreground">
-            {kind === "cover" ? "Images up to 5 MB · videos up to 25 MB" : "JPEG, PNG, GIF, or WebP · up to 5 MB"}
+            {kind === "cover"
+              ? "Images up to 5 MB · videos up to 25 MB"
+              : "Portrait background removal runs in your browser. The AI model downloads the first time; the photo uploads only when you save."}
           </p>
         </div>
       </div>

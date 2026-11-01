@@ -1,11 +1,15 @@
 """Link cards — CRUD for the owner, click tracking for visitors."""
 
-import uuid
 import os
+import uuid
+from io import BytesIO
+from mimetypes import guess_type
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from gridfs.errors import NoFile
+from motor.motor_asyncio import AsyncIOMotorGridFSBucket
 from pymongo import ASCENDING
 
 from lib.db import db
@@ -17,6 +21,7 @@ router = APIRouter()
 UPLOAD_DIR = Path(
     os.environ.get("AURA_UPLOAD_DIR", Path(__file__).resolve().parents[1] / "uploads")
 )
+MEDIA_BUCKET = AsyncIOMotorGridFSBucket(db, bucket_name="uploads")
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_VIDEO_BYTES = 25 * 1024 * 1024
 ALLOWED_MEDIA_EXTENSIONS = {"jpg", "png", "gif", "webp", "mp4", "webm", "mov", "m4v"}
@@ -53,9 +58,13 @@ async def upload_media(file: UploadFile = File(...), user: User = Depends(get_cu
         limit_mb = max_bytes // (1024 * 1024)
         raise HTTPException(status_code=413, detail=f"Files must be {limit_mb} MB or smaller")
 
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     filename = f"{uuid.uuid4().hex}.{extension}"
-    (UPLOAD_DIR / filename).write_bytes(content)
+    await MEDIA_BUCKET.upload_from_stream_with_id(
+        filename.rsplit(".", 1)[0],
+        filename,
+        BytesIO(content),
+        metadata={"content_type": guess_type(filename)[0] or "application/octet-stream"},
+    )
     return {"url": f"/api/uploads/{filename}"}
 
 
@@ -66,10 +75,23 @@ async def get_uploaded_media(filename: str):
     stem = filename.rsplit(".", 1)[0]
     if len(stem) != 32 or any(char not in "0123456789abcdef" for char in stem):
         raise HTTPException(status_code=404, detail="Media not found")
-    path = UPLOAD_DIR / filename
-    if not path.is_file():
-        raise HTTPException(status_code=404, detail="Media not found")
-    return FileResponse(path, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+    try:
+        media = await MEDIA_BUCKET.open_download_stream(stem)
+    except NoFile:
+        path = UPLOAD_DIR / filename
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Media not found") from None
+        return FileResponse(path, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+    content_type = (media.metadata or {}).get(
+        "content_type",
+        guess_type(filename)[0] or "application/octet-stream",
+    )
+    return Response(
+        content=await media.read(),
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+    )
 
 
 @router.get("/me/links", response_model=list[Link])

@@ -112,9 +112,15 @@ FastAPI, async throughout. `python` is the app venv interpreter
      by Render. Add Stripe/eSewa/Khalti merchant
      credentials to enable those payment methods after the free offer ends.
   Render's free web service can sleep after 15 minutes without traffic, so its
-  first request afterward may take about a minute. Its filesystem is temporary:
-  uploaded media can be lost when the service sleeps, restarts, or redeploys.
-  Upgrade to a paid service with a persistent disk if uploads must be retained.
+  first request afterward may take about a minute. Uploaded media is stored in
+  MongoDB Atlas GridFS so it survives Render sleeps and redeploys; it consumes
+  storage in the existing Atlas cluster, so monitor that cluster's storage quota.
+  Files uploaded to Render's temporary local filesystem before this change may
+  need to be uploaded again.
+- **Profile-photo background removal**: profile photos are cut out locally in
+  the browser using Transformers.js and the Apache-2.0 Xenova/MODNet model.
+  The model is downloaded and cached by the browser on first use; the photo
+  itself is only sent to AURA when the user saves the profile.
 - **Dates**: `backend/lib/dates.py` — `today_iso(tz=None)`. The pod clock is
   UTC; anchor "today" server-side with this, never with client-side date math.
 - **Interactive check**: `cd /app/backend && python -c 'import server'` catches
