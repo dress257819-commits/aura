@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ImagePlus, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { UpgradeModal } from "@/components/shared/UpgradeModal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -42,8 +41,6 @@ export default function DashboardShowcase() {
   const [editCaption, setEditCaption] = useState("");
   const [question, setQuestion] = useState("");
   const [options, setOptions] = useState("");
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState<string>();
   const imagePreview = useFilePreview(imageFile);
   const editImagePreview = useFilePreview(editImageFile);
   const galleryLimit = me?.plan === "creator" ? 50 : me?.plan === "pro" ? 12 : 3;
@@ -66,12 +63,7 @@ export default function DashboardShowcase() {
     void queryClient.invalidateQueries({ queryKey: ["profile"] });
   };
   const handleError = (error: unknown) => {
-    if (error instanceof ApiError && error.status === 403) {
-      setUpgradeReason(error.detail);
-      setUpgradeOpen(true);
-    } else {
-      toast.error(error instanceof ApiError ? error.detail : error instanceof Error ? error.message : "Something went wrong");
-    }
+    toast.error(error instanceof ApiError ? error.detail : error instanceof Error ? error.message : "Something went wrong");
   };
 
   const addImage = useMutation({
@@ -483,7 +475,6 @@ export default function DashboardShowcase() {
           </div>
         </div>
       </div>
-      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} reason={upgradeReason} />
     </DashboardShell>
   );
 }

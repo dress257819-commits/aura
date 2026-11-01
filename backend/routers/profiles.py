@@ -247,7 +247,7 @@ async def update_profile(input: ProfileUpdate, user: User = Depends(get_current_
                 raise HTTPException(status_code=409, detail="That username is taken") from exc
             raise
     doc = await db.users.find_one({"id": user.id})
-    return MeProfile(**doc)
+    return MeProfile(**{**doc, "plan": effective_plan(doc)})
 
 
 @router.patch("/me/appearance", response_model=MeProfile)
@@ -290,7 +290,7 @@ async def update_appearance(input: AppearanceUpdate, user: User = Depends(get_cu
 
     await db.users.update_one({"id": user.id}, {"$set": {"appearance": appearance}})
     doc = await db.users.find_one({"id": user.id})
-    return MeProfile(**doc)
+    return MeProfile(**{**doc, "plan": effective_plan(doc)})
 
 
 # ---------- gallery ----------
@@ -308,7 +308,7 @@ async def add_gallery_item(input: GalleryCreate, user: User = Depends(get_curren
     if count >= limits["gallery"]:
         raise HTTPException(
             status_code=403,
-            detail=f"Your {user.plan} plan allows {limits['gallery']} gallery items — upgrade for more.",
+            detail=f"A profile can have up to {limits['gallery']} gallery items.",
         )
     item = GalleryItem(user_id=user.id, url=input.url.strip(), caption=input.caption.strip()[:120])
     await db.gallery.insert_one(item.model_dump())

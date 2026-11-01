@@ -331,6 +331,8 @@ class PlanInfo(BaseModel):
     nepal_price: int
     tagline: str
     features: List[str]
+    promotion_active: bool = False
+    promotion_ends_at: Optional[datetime] = None
 
 
 class CheckoutCreate(BaseModel):

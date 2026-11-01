@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Heart, Search } from "lucide-react";
+import { BadgeCheck, Heart, Search } from "lucide-react";
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
 import { Input } from "@/components/ui/input";
@@ -179,8 +179,8 @@ export default function Explore() {
                     </span>
                   )}
                   {card.plan !== "free" && (
-                    <Badge variant="secondary" className="mb-1 capitalize">
-                      {card.plan}
+                    <Badge variant="secondary" className="mb-1 gap-1 capitalize">
+                      <BadgeCheck className="size-3.5" aria-hidden="true" /> {card.plan}
                     </Badge>
                   )}
                 </div>

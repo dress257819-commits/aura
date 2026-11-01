@@ -1,6 +1,7 @@
 """Link cards — CRUD for the owner, click tracking for visitors."""
 
 import uuid
+import os
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -13,7 +14,9 @@ from lib.session import get_current_user
 from models.models import Link, LinkCreate, LinkUpdate, User, utcnow
 
 router = APIRouter()
-UPLOAD_DIR = Path(__file__).resolve().parents[1] / "uploads"
+UPLOAD_DIR = Path(
+    os.environ.get("AURA_UPLOAD_DIR", Path(__file__).resolve().parents[1] / "uploads")
+)
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_VIDEO_BYTES = 25 * 1024 * 1024
 ALLOWED_MEDIA_EXTENSIONS = {"jpg", "png", "gif", "webp", "mp4", "webm", "mov", "m4v"}
@@ -82,7 +85,7 @@ async def create_link(input: LinkCreate, user: User = Depends(get_current_user))
     if count >= limits["links"]:
         raise HTTPException(
             status_code=403,
-            detail=f"Your {user.plan} plan allows {limits['links']} links. Upgrade to add more.",
+            detail=f"A profile can have up to {limits['links']} links.",
         )
     url = input.url.strip()
     if not url.startswith(("http://", "https://")):

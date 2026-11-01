@@ -6,7 +6,6 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 
 from lib.db import db
-from lib.plans import limits_for
 from lib.session import get_current_user
 from models.models import (
     AnalyticsSummary, DaySeriesPoint, EventCreate, TopLink, User, utcnow,

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useEffect } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   BarChart3, ExternalLink, Image, Inbox, LayoutDashboard, Link2, Palette,
@@ -28,7 +28,6 @@ const NAV = [
 export function DashboardShell({ children, active }: { children: ReactNode; active: string }) {
   const { data: me, isLoading } = useMe();
   const navigate = useNavigate();
-  const location = useLocation();
   const { data: pendingMessages, isError: messageCountError, error: messageCountErrorDetail } = useQuery({
     queryKey: ["my-messages", "count"],
     queryFn: () => apiGet<MessageCounts>("/me/messages/count"),
@@ -156,24 +155,13 @@ export function DashboardShell({ children, active }: { children: ReactNode; acti
             ))}
           </nav>
           <div className="mt-auto rounded-2xl border bg-card p-4 text-sm">
-            <p className="font-heading font-bold capitalize">
-              {me.plan} plan
+            <p className="font-heading font-bold">Manage your plan</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Review available features and payment options on the pricing page.
             </p>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {me.plan === "free" && "5 links, 3 themes — upgrade for the full studio"}
-              {me.plan === "pro" && "15 links, all core themes & glass controls"}
-              {me.plan === "creator" && "100 links, custom CSS & the Luxe theme"}
-            </p>
-            {me.plan !== "creator" && (
-              <Button
-                size="sm"
-                className="mt-3 w-full shadow-lg shadow-indigo-500/25"
-                onClick={() => navigate("/pricing", { state: { from: location.pathname } })}
-                data-testid="dash-upgrade-button"
-              >
-                Upgrade
-              </Button>
-            )}
+            <Link to="/pricing" className="mt-3 inline-flex text-xs font-semibold text-primary hover:underline">
+              View plans
+            </Link>
           </div>
         </aside>
 

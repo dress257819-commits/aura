@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from passlib.context import CryptContext
 from starlette.responses import RedirectResponse
 
+from lib.plans import effective_plan
 from lib.session import (
     cookie_secure,
     create_session,
@@ -75,7 +76,8 @@ def me_response(user: User) -> MeProfile:
         bio=user.bio, location=user.location, avatar_url=user.avatar_url,
         cover_url=user.cover_url, interests=user.interests,
         daily_question=user.daily_question, music=user.music,
-        appearance=user.appearance, chatbot=user.chatbot, plan=user.plan,
+        appearance=user.appearance, chatbot=user.chatbot,
+        plan=effective_plan(user.model_dump()),
         leaderboard_visible=user.leaderboard_visible, created_at=user.created_at,
     )
 

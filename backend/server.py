@@ -1,7 +1,9 @@
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.cors import CORSMiddleware
 import os
 import logging
@@ -84,6 +86,11 @@ api_router.include_router(billing_router)
 # Include the router in the main app
 app.include_router(api_router)
 
+@app.get("/api/health")
+async def health_check():
+    await db.command("ping")
+    return {"status": "ok"}
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -98,3 +105,21 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+frontend_dist = Path(os.environ.get("FRONTEND_DIST", ROOT_DIR.parent / "frontend" / "dist"))
+frontend_index = frontend_dist / "index.html"
+if frontend_index.is_file():
+    assets_dir = frontend_dist / "assets"
+    if assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="frontend-assets")
+
+    @app.get("/{path:path}", include_in_schema=False)
+    async def frontend_fallback(path: str):
+        if path == "api" or path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="API route not found")
+        requested = (frontend_dist / path).resolve()
+        if requested.is_relative_to(frontend_dist.resolve()) and requested.is_file():
+            return FileResponse(requested)
+        if Path(path).suffix:
+            raise HTTPException(status_code=404, detail="File not found")
+        return FileResponse(frontend_index)

@@ -80,36 +80,26 @@ FastAPI, async throughout. `python` is the app venv interpreter
   use `http://localhost:8001/api/auth/google/callback` as the authorized
   redirect URI and `http://localhost:3000/auth` as the frontend return URL.
   Keep the client secret private and never commit `.env`.
-- **Premium billing**: paid access is granted only after provider verification.
-  Stripe uses recurring monthly USD Price IDs; Nepal checkout uses eSewa and
-  Khalti in NPR, with each verified payment granting 30 days (renew manually).
-  Configure these values in `backend/.env` and use test credentials first:
-
-  ```dotenv
-  FRONTEND_URL=http://localhost:3000
-  BACKEND_PUBLIC_URL=https://your-public-api.example
-  NPR_PER_USD=135
-
-  STRIPE_SECRET_KEY=
-  STRIPE_PRICE_PRO=
-  STRIPE_PRICE_CREATOR=
-  STRIPE_WEBHOOK_SECRET=
-
-  ESEWA_ENV=sandbox
-  ESEWA_PRODUCT_CODE=
-  ESEWA_SECRET_KEY=
-
-  KHALTI_ENV=sandbox
-  KHALTI_SECRET_KEY=
-  ```
-
-  Create Stripe recurring monthly prices of $9 and $29 and set their Price IDs.
-  Register `POST /api/billing/webhooks/stripe` for checkout completion, paid
-  invoices, and subscription deletion; set its signing secret above.
-  `BACKEND_PUBLIC_URL` must be reachable by eSewa/Khalti for payment callbacks.
-  The NPR figures are calculated from the USD plan prices and `NPR_PER_USD`;
-  set that rate to the price you intend to charge. Bank transfer checkout is
-  not enabled.
+- **Plans and billing**: the full AURA feature set is free for all accounts
+  during the 30-day promotion, which ends at `2026-12-01T16:36:13.739Z` by default.
+  Set `AURA_FREE_ACCESS_END` to a timezone-aware ISO-8601 datetime in
+  `backend/.env` to adjust the site-wide cutoff. After the cutoff, the Free,
+  Pro, and Creator entitlements and configured checkout providers resume.
+  Stripe, eSewa, and Khalti still require their merchant credentials.
+- **Deploy the complete website**: the root `Dockerfile` builds the Vite frontend
+  and serves it with FastAPI, so pages, `/api`, and sign-in cookies share one
+  origin. `render.yaml` creates the Render web service and persistent media disk.
+  Create a MongoDB Atlas database first, then in Render choose **New → Blueprint**
+  and connect this GitHub repository. Set the required `MONGO_URL` to the Atlas
+  connection string, allow Render's outbound access in Atlas Network Access, and
+  deploy. Use the Render URL assigned to the service to update `CORS_ORIGINS`,
+  `FRONTEND_URL`, `BACKEND_PUBLIC_URL`, `GOOGLE_REDIRECT_URI`, and
+  `GOOGLE_FRONTEND_URL`; add that OAuth callback URL in Google Cloud if Google
+  sign-in is enabled. Add `EMERGENT_LLM_KEY` for AI replies and provider merchant
+  credentials to enable billing after the free offer ends. Never commit secrets.
+  Render's Starter web service and persistent disk are paid resources; review
+  current pricing before creating them. A free/ephemeral service is not suitable
+  for production uploads because uploaded media would not persist across deploys.
 - **Dates**: `backend/lib/dates.py` — `today_iso(tz=None)`. The pod clock is
   UTC; anchor "today" server-side with this, never with client-side date math.
 - **Interactive check**: `cd /app/backend && python -c 'import server'` catches

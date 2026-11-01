@@ -929,7 +929,9 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
           <section className={cn("rounded-[1.75rem] border p-4 backdrop-blur-xl sm:p-6", !preview && "lg:col-span-4")} style={hubPanelStyle} data-testid="creator-hub-about">
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-heading text-lg font-bold">About me</h2>
-              {profile.plan !== "free" && <span className="rounded-full border border-violet-300/20 bg-violet-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-violet-200">{profile.plan}</span>}
+              <span className="inline-flex items-center gap-1 rounded-full border border-sky-300/20 bg-sky-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-sky-200">
+                <BadgeCheck className="size-3" aria-hidden="true" /> Verified
+              </span>
             </div>
             <p className="mt-4 text-sm leading-6 text-white/65">
               {profile.bio || `Explore ${profile.name}’s links, work, and latest updates.`}

@@ -6,7 +6,6 @@ import {
   Pencil, Plus, RotateCcw, Trash2, Upload, X,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { UpgradeModal } from "@/components/shared/UpgradeModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -80,8 +79,6 @@ export default function DashboardLinks() {
   const [form, setForm] = useState<FormState | null>(null);
   const coverFilePreview = useFilePreview(form?.thumbnail_file ?? null);
   const iconFilePreview = useFilePreview(form?.icon_file ?? null);
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState<string | undefined>();
 
   const linksQuery = useQuery({
     queryKey: ["my-links"],
@@ -97,12 +94,7 @@ export default function DashboardLinks() {
   };
 
   const onError = (err: unknown) => {
-    if (err instanceof ApiError && err.status === 403) {
-      setUpgradeReason(err.detail);
-      setUpgradeOpen(true);
-    } else {
-      toast.error(err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Something went wrong");
-    }
+    toast.error(err instanceof ApiError ? err.detail : err instanceof Error ? err.message : "Something went wrong");
   };
 
   const save = useMutation({
@@ -210,9 +202,10 @@ export default function DashboardLinks() {
               <Button
                 className="shadow-lg shadow-indigo-500/20"
                 onClick={() => setForm({ ...EMPTY })}
+                disabled={links.length >= linkLimit}
                 data-testid="links-add-button"
               >
-                <Plus className="size-4" /> Add link
+                <Plus className="size-4" /> {links.length >= linkLimit ? "Link limit reached" : "Add link"}
               </Button>
             </div>
           </div>
@@ -241,8 +234,13 @@ export default function DashboardLinks() {
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
               Add your Instagram, shop, portfolio, playlist, or anything else you want people to find.
             </p>
-            <Button className="mt-5" onClick={() => setForm({ ...EMPTY })} data-testid="links-empty-add-button">
-              <Plus className="size-4" /> Add your first link
+            <Button
+              className="mt-5"
+              onClick={() => setForm({ ...EMPTY })}
+              disabled={links.length >= linkLimit}
+              data-testid="links-empty-add-button"
+            >
+              <Plus className="size-4" /> {links.length >= linkLimit ? "Link limit reached" : "Add your first link"}
             </Button>
           </div>
         ) : (
@@ -563,7 +561,6 @@ export default function DashboardLinks() {
         </DialogContent>
       </Dialog>
 
-      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} reason={upgradeReason} />
     </DashboardShell>
   );
 }

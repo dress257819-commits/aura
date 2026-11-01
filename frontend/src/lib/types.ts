@@ -175,6 +175,8 @@ export interface PlanInfo {
   nepal_price?: number;
   tagline: string;
   features: string[];
+  promotion_active?: boolean;
+  promotion_ends_at?: string | null;
 }
 
 export interface BillingOptions {

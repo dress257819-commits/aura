@@ -52,13 +52,7 @@ async def get_current_user(request: Request) -> User:
     doc = await db.users.find_one({"id": session["user_id"]})
     if not doc:
         raise HTTPException(status_code=401, detail="Account not found")
-    if effective_plan(doc) != doc.get("plan", "free"):
-        await db.users.update_one(
-            {"id": doc["id"]},
-            {"$set": {"plan": "free"}, "$unset": {"plan_expires_at": ""}},
-        )
-        doc["plan"] = "free"
-        doc.pop("plan_expires_at", None)
+    doc["plan"] = effective_plan(doc)
     return User(**doc)
 
 
@@ -70,13 +64,8 @@ async def get_optional_user(request: Request) -> User | None:
     if not session:
         return None
     doc = await db.users.find_one({"id": session["user_id"]})
-    if doc and effective_plan(doc) != doc.get("plan", "free"):
-        await db.users.update_one(
-            {"id": doc["id"]},
-            {"$set": {"plan": "free"}, "$unset": {"plan_expires_at": ""}},
-        )
-        doc["plan"] = "free"
-        doc.pop("plan_expires_at", None)
+    if doc:
+        doc["plan"] = effective_plan(doc)
     return User(**doc) if doc else None
 
 

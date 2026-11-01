@@ -1,6 +1,7 @@
 import pytest
 from fastapi import HTTPException
 
+from lib.plans import effective_plan
 from models.models import User
 from routers.profiles import ProfileUpdate, update_profile
 
@@ -34,7 +35,30 @@ def make_user(plan: str, cover_url: str = "") -> User:
     )
 
 
-async def test_free_user_cannot_add_profile_banner(monkeypatch):
+@pytest.mark.parametrize("plan", ["pro", "creator"])
+async def test_paid_users_can_set_profile_banner(monkeypatch, plan):
+    monkeypatch.setenv("AURA_FREE_ACCESS_END", "2026-01-01T00:00:00Z")
+    user = make_user(plan)
+    monkeypatch.setattr("routers.profiles.db", FakeDatabase(user))
+
+    updated = await update_profile(ProfileUpdate(cover_url="https://example.com/banner.jpg"), user)
+
+    assert updated.cover_url == "https://example.com/banner.jpg"
+
+
+async def test_free_user_can_set_profile_banner_during_promotion(monkeypatch):
+    monkeypatch.setenv("AURA_FREE_ACCESS_END", "2026-12-01T16:36:13Z")
+    user = make_user("free")
+    user.plan = effective_plan(user.model_dump())
+    monkeypatch.setattr("routers.profiles.db", FakeDatabase(user))
+
+    updated = await update_profile(ProfileUpdate(cover_url="https://example.com/banner.jpg"), user)
+
+    assert updated.cover_url == "https://example.com/banner.jpg"
+
+
+async def test_free_user_cannot_add_profile_banner_after_promotion(monkeypatch):
+    monkeypatch.setenv("AURA_FREE_ACCESS_END", "2026-01-01T00:00:00Z")
     user = make_user("free")
     monkeypatch.setattr("routers.profiles.db", FakeDatabase(user))
 
@@ -42,17 +66,6 @@ async def test_free_user_cannot_add_profile_banner(monkeypatch):
         await update_profile(ProfileUpdate(cover_url="https://example.com/banner.jpg"), user)
 
     assert error.value.status_code == 403
-    assert "Pro and Creator" in error.value.detail
-
-
-@pytest.mark.parametrize("plan", ["pro", "creator"])
-async def test_premium_user_can_set_profile_banner(monkeypatch, plan):
-    user = make_user(plan)
-    monkeypatch.setattr("routers.profiles.db", FakeDatabase(user))
-
-    updated = await update_profile(ProfileUpdate(cover_url="https://example.com/banner.jpg"), user)
-
-    assert updated.cover_url == "https://example.com/banner.jpg"
 
 
 async def test_free_user_can_remove_existing_profile_banner(monkeypatch):

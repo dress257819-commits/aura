@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from lib.db import db
+from lib.plans import effective_plan, free_access_active, free_access_until
 from lib.session import get_current_user
 from models.models import CheckoutCreate, CheckoutResponse, MeProfile, PlanInfo, User, utcnow
 
@@ -271,6 +272,27 @@ def _stripe_signature_valid(raw_body: bytes, signature_header: str, secret: str)
 
 @router.get("/plans", response_model=list[PlanInfo])
 async def list_plans():
+    if free_access_active():
+        return [
+            PlanInfo(
+                key="free",
+                name="AURA",
+                price=0,
+                nepal_price=0,
+                tagline="Every feature included for everyone during our 30-day offer.",
+                features=[
+                    "Verified blue tick on every profile",
+                    "Up to 100 profile links and 50 gallery items",
+                    "Every theme, premium font, card style, and visual effect",
+                    "Custom profile CSS and profile banners",
+                    "AI twin with custom instructions and boundaries",
+                    "Story Studio downloads and sharing",
+                    "Advanced analytics and priority discovery",
+                ],
+                promotion_active=True,
+                promotion_ends_at=free_access_until(),
+            )
+        ]
     return [
         PlanInfo(
             key=key,
@@ -279,6 +301,7 @@ async def list_plans():
             nepal_price=_npr_amount(plan["price"]),
             tagline=plan["tagline"],
             features=plan["features"],
+            promotion_ends_at=free_access_until(),
         )
         for key, plan in PLAN_DETAILS.items()
     ]
@@ -288,21 +311,28 @@ async def list_plans():
 async def billing_options():
     return {
         "international": {
-            "stripe": bool(
+            "stripe": not free_access_active() and bool(
                 os.environ.get("STRIPE_SECRET_KEY")
                 and os.environ.get("STRIPE_PRICE_PRO")
                 and os.environ.get("STRIPE_PRICE_CREATOR")
             )
         },
         "nepal": {
-            "esewa": bool(os.environ.get("ESEWA_PRODUCT_CODE") and os.environ.get("ESEWA_SECRET_KEY")),
-            "khalti": bool(os.environ.get("KHALTI_SECRET_KEY")),
+            "esewa": not free_access_active() and bool(
+                os.environ.get("ESEWA_PRODUCT_CODE") and os.environ.get("ESEWA_SECRET_KEY")
+            ),
+            "khalti": not free_access_active() and bool(os.environ.get("KHALTI_SECRET_KEY")),
         },
     }
 
 
 @router.post("/me/billing/checkout", response_model=CheckoutResponse)
 async def create_checkout(input: CheckoutCreate, user: User = Depends(get_current_user)):
+    if free_access_active():
+        raise HTTPException(
+            status_code=503,
+            detail="Payments are paused during the 30-day all-features-free offer.",
+        )
     if input.region == "international" and input.provider != "stripe":
         raise HTTPException(status_code=422, detail="Choose Stripe for international checkout")
     if input.region == "nepal" and input.provider == "stripe":
@@ -451,7 +481,7 @@ async def confirm_stripe_checkout(
         raise HTTPException(status_code=403, detail="This checkout belongs to another account")
     await _activate_stripe_session(session)
     doc = await db.users.find_one({"id": user.id})
-    return MeProfile(**doc)
+    return MeProfile(**{**doc, "plan": effective_plan(doc)})
 
 
 @router.post("/me/billing/downgrade", response_model=MeProfile)
@@ -474,7 +504,7 @@ async def downgrade(user: User = Depends(get_current_user)):
         }},
     )
     fresh = await db.users.find_one({"id": user.id})
-    return MeProfile(**fresh)
+    return MeProfile(**{**fresh, "plan": effective_plan(fresh)})
 
 
 @router.post("/billing/webhooks/stripe")

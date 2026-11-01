@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Check, Crown, ExternalLink, Lock, Paintbrush, Upload, X,
+  Check, ExternalLink, Lock, Paintbrush, Upload, X,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { PhoneFrame } from "@/components/shared/PhoneFrame";
@@ -19,6 +19,13 @@ import { FONT_OPTIONS, PROFILE_THEMES } from "@/lib/themes";
 import type { Appearance, ChatbotSettings, Link, MeProfile, ProfileBundle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+const CARD_STYLES = [
+  { key: "rounded", name: "Rounded", description: "Clean and familiar", plan: "free" },
+  { key: "soft", name: "Soft", description: "Extra-smooth corners", plan: "free" },
+  { key: "editorial", name: "Editorial", description: "Crisp, framed cards", plan: "pro" },
+  { key: "glass", name: "Glass", description: "Airy, luminous layers", plan: "pro" },
+  { key: "outline", name: "Outline", description: "A bold creator finish", plan: "creator" },
+];
 const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, creator: 2 };
 const THEME_MIN_PLAN: Record<string, string> = {
   cyber: "pro",
@@ -32,19 +39,16 @@ const FONT_MIN_PLAN: Record<string, string> = {
   playfair: "creator",
   lora: "creator",
 };
-const CARD_STYLES = [
-  { key: "rounded", name: "Rounded", description: "Clean and familiar", plan: "free" },
-  { key: "soft", name: "Soft", description: "Extra-smooth corners", plan: "free" },
-  { key: "editorial", name: "Editorial", description: "Crisp, framed cards", plan: "pro" },
-  { key: "glass", name: "Glass", description: "Airy, luminous layers", plan: "pro" },
-  { key: "outline", name: "Outline", description: "A bold creator finish", plan: "creator" },
-];
 const ACCENT_PRESETS = ["#8B5CF6", "#EC4899", "#22C55E", "#0EA5E9", "#F97316", "#EAB308"];
 const INTEREST_OPTIONS = ["Design", "Tech", "Music", "Gaming", "Fitness", "Photography", "Art"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]);
+
+function isUnlocked(plan: string, requiredPlan?: string) {
+  return !requiredPlan || (PLAN_RANK[plan] ?? 0) >= (PLAN_RANK[requiredPlan] ?? 0);
+}
 
 function isVideoMedia(fileOrUrl: File | string) {
   if (typeof fileOrUrl !== "string") {
@@ -69,10 +73,6 @@ interface ProfileDraft {
 interface PreviewData {
   bundle: ProfileBundle;
   warning?: string;
-}
-
-function isUnlocked(plan: string, requiredPlan?: string) {
-  return !requiredPlan || (PLAN_RANK[plan] ?? 0) >= (PLAN_RANK[requiredPlan] ?? 0);
 }
 
 function parseInterests(value: string): string[] {
@@ -299,13 +299,17 @@ export default function DashboardCustomize() {
   const [appearance, setAppearance] = useState<Appearance | null>(me?.appearance ?? null);
   const [profileDraft, setProfileDraft] = useState<ProfileDraft | null>(me ? draftFromProfile(me) : null);
   const [availabilityUsername, setAvailabilityUsername] = useState("");
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeReason, setUpgradeReason] = useState<string>();
-  const [upgradePlan, setUpgradePlan] = useState("pro");
   const [customInterestsOpen, setCustomInterestsOpen] = useState(false);
   const [customCss, setCustomCss] = useState("");
   const [aiInstructions, setAiInstructions] = useState("");
   const [aiBoundaries, setAiBoundaries] = useState("");
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string>();
+
+  const requestUpgrade = (plan: string | undefined, feature: string) => {
+    setUpgradeReason(`${feature} is included with ${plan === "creator" ? "Creator" : "Pro"} and higher plans.`);
+    setUpgradeOpen(true);
+  };
 
   useEffect(() => {
     if (me?.appearance) {
@@ -375,12 +379,7 @@ export default function DashboardCustomize() {
     },
     onError: (error) => {
       setAppearance(queryClient.getQueryData<MeProfile>(["me"])?.appearance ?? null);
-      if (error instanceof ApiError && error.status === 403) {
-        setUpgradeReason(error.detail);
-        setUpgradeOpen(true);
-      } else {
-        toast.error(error instanceof ApiError ? error.detail : error instanceof Error ? error.message : "Couldn't save your appearance");
-      }
+      toast.error(error instanceof ApiError ? error.detail : error instanceof Error ? error.message : "Couldn't save your appearance");
     },
   });
 
@@ -397,11 +396,7 @@ export default function DashboardCustomize() {
       toast.success("Your AI twin settings are saved");
     },
     onError: (error) => {
-      if (error instanceof ApiError && error.status === 403) {
-        requestUpgrade(error.detail, error.detail.toLowerCase().includes("creator") ? "creator" : "pro");
-      } else {
-        toast.error(error instanceof ApiError ? error.detail : "Couldn't save AI twin settings");
-      }
+      toast.error(error instanceof ApiError ? error.detail : "Couldn't save AI twin settings");
     },
   });
 
@@ -447,12 +442,6 @@ export default function DashboardCustomize() {
     if (saveAppearance.isPending) return;
     setAppearance((current) => current ? { ...current, ...changes } : current);
     saveAppearance.mutate(changes);
-  };
-
-  const requestUpgrade = (reason: string, plan = "pro") => {
-    setUpgradePlan(plan);
-    setUpgradeReason(reason);
-    setUpgradeOpen(true);
   };
 
   const selectedTheme = appearance ? PROFILE_THEMES[appearance.theme] : undefined;
@@ -613,25 +602,13 @@ export default function DashboardCustomize() {
                           onFileChange={(cover_file) => setProfileDraft({ ...profileDraft, cover_file })}
                         />
                       ) : (
-                        <div
-                          className="flex min-h-40 flex-col justify-between rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4"
-                          data-testid="profile-banner-upgrade"
-                        >
-                          <div>
-                            <p className="flex items-center gap-2 text-sm font-semibold">
-                              <Crown className="size-4 text-primary" /> Profile banner
-                            </p>
-                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                              Add an image or video below your profile photo with a Pro or Creator plan.
-                            </p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="mt-4 w-fit rounded-full"
-                            onClick={() => requestUpgrade("Profile banners are available on Pro and Creator plans")}
-                          >
-                            Unlock profile banner
+                        <div className="rounded-2xl border border-dashed border-border p-4">
+                          <p className="text-sm font-semibold">Profile banner · Pro</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Add a custom banner with a Pro or Creator plan.
+                          </p>
+                          <Button className="mt-3" size="sm" variant="outline" onClick={() => requestUpgrade("pro", "Profile banners")}>
+                            View plans
                           </Button>
                         </div>
                       )}
@@ -783,7 +760,7 @@ export default function DashboardCustomize() {
                         aria-pressed={active}
                         onClick={() => {
                           if (!unlocked) {
-                            requestUpgrade(`The “${theme.name}” theme is available on the ${requiredPlan} plan.`, requiredPlan);
+                            requestUpgrade(requiredPlan, `${theme.name} theme`);
                             return;
                           }
                           if (!active) updateAppearance({ theme: theme.key, accent: theme.accent });
@@ -810,8 +787,8 @@ export default function DashboardCustomize() {
                               <Check className="size-4" />
                             </span>
                           ) : !unlocked ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-black/35 px-2 py-1 text-[10px] font-semibold text-white">
-                              <Lock className="size-3" /> {requiredPlan}
+                            <span className="grid size-7 place-items-center rounded-full bg-black/25">
+                              <Lock className="size-4" />
                             </span>
                           ) : null}
                         </span>
@@ -846,7 +823,7 @@ export default function DashboardCustomize() {
                           aria-pressed={active}
                           onClick={() => {
                             if (!unlocked) {
-                              requestUpgrade(`${font.name} is available on the ${requiredPlan} plan.`, requiredPlan);
+                              requestUpgrade(requiredPlan, `${font.name} font`);
                               return;
                             }
                             if (!active) updateAppearance({ font: key });
@@ -854,13 +831,12 @@ export default function DashboardCustomize() {
                           className={cn(
                             "flex min-h-16 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors hover:border-primary/50",
                             active ? "border-primary bg-primary/5 text-primary" : "border-border/70",
-                            !unlocked && "opacity-70",
                           )}
                           style={{ fontFamily: font.stack }}
                           data-testid={`customize-font-${key}`}
                         >
                           <span className="truncate text-sm font-semibold">{font.name}</span>
-                          {active ? <Check className="size-4 shrink-0" /> : !unlocked ? <Lock className="size-3.5 shrink-0 text-muted-foreground" /> : null}
+                          {active ? <Check className="size-4 shrink-0" /> : !unlocked ? <Lock className="size-4 shrink-0" /> : null}
                         </button>
                       );
                     })}
@@ -887,7 +863,7 @@ export default function DashboardCustomize() {
                           aria-pressed={active}
                           onClick={() => {
                             if (!unlocked) {
-                              requestUpgrade(`${style.name} card design is available on the ${style.plan} plan.`, style.plan);
+                              requestUpgrade(style.plan, `${style.name} card style`);
                               return;
                             }
                             if (!active) updateAppearance({ card_style: style.key });
@@ -895,7 +871,6 @@ export default function DashboardCustomize() {
                           className={cn(
                             "flex min-h-[76px] items-center gap-3 rounded-xl border p-3 text-left transition-colors hover:border-primary/50",
                             active ? "border-primary bg-primary/5" : "border-border/70",
-                            !unlocked && "opacity-75",
                           )}
                           data-testid={`customize-card-style-${style.key}`}
                         >
@@ -915,8 +890,8 @@ export default function DashboardCustomize() {
                           <span className="min-w-0 flex-1">
                             <span className="flex items-center gap-1.5 text-sm font-semibold">
                               {style.name}
-                              {!unlocked && <Lock className="size-3 text-muted-foreground" />}
                               {active && <Check className="size-3.5 text-primary" />}
+                              {!active && !unlocked && <Lock className="size-3.5" />}
                             </span>
                             <span className="mt-0.5 block text-xs text-muted-foreground">{style.description}</span>
                           </span>
@@ -987,7 +962,7 @@ export default function DashboardCustomize() {
                           aria-pressed={appearance?.glass === level}
                           onClick={() => {
                             if (locked) {
-                              requestUpgrade("The strongest glass effect is available with a Pro plan.");
+                              requestUpgrade("pro", "Stronger glass effects");
                               return;
                             }
                             updateAppearance({ glass: level });
@@ -995,11 +970,9 @@ export default function DashboardCustomize() {
                           className={cn(
                             "flex h-10 items-center justify-center gap-1 rounded-xl border text-xs font-medium transition-colors hover:border-primary/50",
                             appearance?.glass === level ? "border-primary bg-primary/5 text-primary" : "border-border/70",
-                            locked && "text-muted-foreground",
                           )}
                         >
-                          {locked && <Lock className="size-3" />}
-                          {["Off", "Soft", "Medium", "Strong"][level]}
+                          {locked ? <Lock className="size-3.5" /> : ["Off", "Soft", "Medium", "Strong"][level]}
                         </button>
                       );
                     })}
@@ -1067,15 +1040,15 @@ export default function DashboardCustomize() {
                     </Button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => requestUpgrade("Custom profile CSS is included with Creator.", "creator")}
-                    className="flex w-full items-center gap-3 rounded-xl border border-dashed p-4 text-left transition-colors hover:border-primary/40"
-                    data-testid="customize-custom-css-locked"
-                  >
-                    <Lock className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Unlock custom CSS with Creator</span>
-                  </button>
+                  <div className="rounded-2xl border border-dashed border-border p-4">
+                    <p className="text-sm font-semibold">Custom CSS · Creator</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Unlock scoped profile styling with a Creator plan.
+                    </p>
+                    <Button className="mt-3" size="sm" variant="outline" onClick={() => requestUpgrade("creator", "Custom CSS")}>
+                      View plans
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -1125,37 +1098,19 @@ export default function DashboardCustomize() {
                     </Button>
                   </>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => requestUpgrade("Custom AI instructions and boundaries are included with Creator.", "creator")}
-                    className="flex w-full items-center gap-3 rounded-xl border border-dashed p-4 text-left transition-colors hover:border-primary/40"
-                    data-testid="customize-ai-settings-locked"
-                  >
-                    <Lock className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Unlock custom AI instructions with Creator</span>
-                  </button>
+                  <div className="rounded-2xl border border-dashed border-border p-4">
+                    <p className="text-sm font-semibold">Custom AI instructions · Creator</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Add approved notes and boundaries for your AI twin with a Creator plan.
+                    </p>
+                    <Button className="mt-3" size="sm" variant="outline" onClick={() => requestUpgrade("creator", "Custom AI instructions")}>
+                      View plans
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
 
-            {me?.plan !== "creator" && (
-              <button
-                type="button"
-                onClick={() => requestUpgrade("Unlock every theme and font to make your AURA page completely your own.", "creator")}
-                className="flex w-full items-center gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-left transition-colors hover:border-primary/30 hover:bg-primary/10"
-              >
-                <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-                  <Crown className="size-5" />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">Want the full studio?</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    Unlock more themes, fonts, and creative controls.
-                  </span>
-                </span>
-                <span className="text-sm font-semibold text-primary">Explore plans</span>
-              </button>
-            )}
           </div>
 
           <aside className="order-first xl:order-last xl:sticky xl:top-20">
@@ -1229,12 +1184,11 @@ export default function DashboardCustomize() {
           </aside>
         </div>
       </div>
-
       <UpgradeModal
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}
+        initialPlan={upgradeReason?.includes("Creator") ? "creator" : "pro"}
         reason={upgradeReason}
-        initialPlan={upgradePlan}
       />
     </DashboardShell>
   );
