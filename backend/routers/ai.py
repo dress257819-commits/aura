@@ -109,6 +109,19 @@ async def profile_chat(username: str, input: ChatCreate):
     if not api_key:
         raise HTTPException(status_code=503, detail="AI is not configured right now")
 
+    try:
+        from emergentintegrations.llm.chat import (
+            LlmChat,
+            StreamDone,
+            TextDelta,
+            UserMessage,
+        )
+    except ImportError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="AI chat is temporarily unavailable on this deployment.",
+        ) from exc
+
     # grounding: approved facts + the profile's live links
     links = await db.links.find(
         {"user_id": owner["id"], "active": True}
@@ -130,8 +143,6 @@ async def profile_chat(username: str, input: ChatCreate):
         transcript += f"{who}: {turn.content}\n"
     prompt = (f"Conversation so far:\n{transcript}\nVisitor: {question}\nYou:"
               if transcript else question)
-
-    from emergentintegrations.llm.chat import LlmChat, UserMessage, TextDelta, StreamDone
 
     chat = LlmChat(
         api_key=api_key,

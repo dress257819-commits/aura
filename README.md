@@ -101,8 +101,10 @@ FastAPI, async throughout. `python` is the app venv interpreter
   4. Optional integrations need secrets added in the Render dashboard, never
      committed: configure Google OAuth with the service URL plus
      `/api/auth/google/callback`, set `GOOGLE_FRONTEND_URL` to the service URL
-     plus `/auth`, set `FRONTEND_URL` and `BACKEND_PUBLIC_URL` to the service URL,
-     and add `EMERGENT_LLM_KEY` for AI replies. Add Stripe/eSewa/Khalti merchant
+     plus `/auth`, and set `FRONTEND_URL` and `BACKEND_PUBLIC_URL` to the service URL.
+     AI chat is temporarily unavailable on this public deployment because its
+     Emergent-only Python integration is not published on the package index used
+     by Render. Add Stripe/eSewa/Khalti merchant
      credentials to enable those payment methods after the free offer ends.
   Render's free web service can sleep after 15 minutes without traffic, so its
   first request afterward may take about a minute. Its filesystem is temporary:
