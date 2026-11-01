@@ -21,10 +21,17 @@ router = APIRouter()
 UPLOAD_DIR = Path(
     os.environ.get("AURA_UPLOAD_DIR", Path(__file__).resolve().parents[1] / "uploads")
 )
-MEDIA_BUCKET = AsyncIOMotorGridFSBucket(db, bucket_name="uploads")
+MEDIA_BUCKET: AsyncIOMotorGridFSBucket | None = None
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_VIDEO_BYTES = 25 * 1024 * 1024
 ALLOWED_MEDIA_EXTENSIONS = {"jpg", "png", "gif", "webp", "mp4", "webm", "mov", "m4v"}
+
+
+def media_bucket() -> AsyncIOMotorGridFSBucket:
+    global MEDIA_BUCKET
+    if MEDIA_BUCKET is None:
+        MEDIA_BUCKET = AsyncIOMotorGridFSBucket(db, bucket_name="uploads")
+    return MEDIA_BUCKET
 
 
 def media_extension(content: bytes) -> str | None:
@@ -59,7 +66,7 @@ async def upload_media(file: UploadFile = File(...), user: User = Depends(get_cu
         raise HTTPException(status_code=413, detail=f"Files must be {limit_mb} MB or smaller")
 
     filename = f"{uuid.uuid4().hex}.{extension}"
-    await MEDIA_BUCKET.upload_from_stream_with_id(
+    await media_bucket().upload_from_stream_with_id(
         filename.rsplit(".", 1)[0],
         filename,
         BytesIO(content),
@@ -76,7 +83,7 @@ async def get_uploaded_media(filename: str):
     if len(stem) != 32 or any(char not in "0123456789abcdef" for char in stem):
         raise HTTPException(status_code=404, detail="Media not found")
     try:
-        media = await MEDIA_BUCKET.open_download_stream(stem)
+        media = await media_bucket().open_download_stream(stem)
     except NoFile:
         path = UPLOAD_DIR / filename
         if not path.is_file():

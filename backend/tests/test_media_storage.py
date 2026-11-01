@@ -1,3 +1,4 @@
+import asyncio
 from io import BytesIO
 from pathlib import Path
 
@@ -60,6 +61,26 @@ async def test_uploaded_media_is_stored_in_mongodb_and_served_from_gridfs(monkey
     assert media.body == content
     assert media.media_type == "image/png"
     assert media.headers["cache-control"] == "public, max-age=31536000, immutable"
+
+
+async def test_media_bucket_is_created_on_the_active_event_loop(monkeypatch):
+    loops = []
+
+    class LoopAwareMediaBucket(FakeMediaBucket):
+        def __init__(self, database, bucket_name):
+            loops.append(asyncio.get_running_loop())
+            super().__init__()
+
+    monkeypatch.setattr(links, "MEDIA_BUCKET", None)
+    monkeypatch.setattr(links, "AsyncIOMotorGridFSBucket", LoopAwareMediaBucket)
+    upload = UploadFile(
+        filename="portrait.png",
+        file=BytesIO(b"\x89PNG\r\n\x1a\nAURA image"),
+    )
+
+    await links.upload_media(upload, upload_user())
+
+    assert loops == [asyncio.get_running_loop()]
 
 
 async def test_missing_gridfs_media_returns_not_found(monkeypatch, tmp_path: Path):
