@@ -86,20 +86,26 @@ FastAPI, async throughout. `python` is the app venv interpreter
   `backend/.env` to adjust the site-wide cutoff. After the cutoff, the Free,
   Pro, and Creator entitlements and configured checkout providers resume.
   Stripe, eSewa, and Khalti still require their merchant credentials.
-- **Deploy the complete website**: the root `Dockerfile` builds the Vite frontend
-  and serves it with FastAPI, so pages, `/api`, and sign-in cookies share one
-  origin. `render.yaml` creates the Render web service and persistent media disk.
-  Create a MongoDB Atlas database first, then in Render choose **New → Blueprint**
-  and connect this GitHub repository. Set the required `MONGO_URL` to the Atlas
-  connection string, allow Render's outbound access in Atlas Network Access, and
-  deploy. Use the Render URL assigned to the service to update `CORS_ORIGINS`,
-  `FRONTEND_URL`, `BACKEND_PUBLIC_URL`, `GOOGLE_REDIRECT_URI`, and
-  `GOOGLE_FRONTEND_URL`; add that OAuth callback URL in Google Cloud if Google
-  sign-in is enabled. Add `EMERGENT_LLM_KEY` for AI replies and provider merchant
-  credentials to enable billing after the free offer ends. Never commit secrets.
-  Render's Starter web service and persistent disk are paid resources; review
-  current pricing before creating them. A free/ephemeral service is not suitable
-  for production uploads because uploaded media would not persist across deploys.
+- **Deploy the complete website**:
+  1. Create a MongoDB Atlas cluster and database user. Copy the application
+     connection string as the private `MONGO_URL` value. In Atlas Network Access,
+     allow the Render service's outbound IPs; if using a temporary broad IP rule,
+     replace it with the listed Render IPs after deployment.
+  2. Sign in at Render, choose **New → Blueprint**, and connect
+     `dress257819-commits/aura`. Render reads `render.yaml`, builds the root
+     `Dockerfile`, and serves the frontend and FastAPI API on one HTTPS origin.
+     Enter the Atlas connection string for `MONGO_URL` and deploy.
+  3. Open the Render service URL and check `/api/health`. Create an account and
+     try profile editing, uploads, links, messages, and the dashboard.
+  4. Optional integrations need secrets added in the Render dashboard, never
+     committed: configure Google OAuth with the service URL plus
+     `/api/auth/google/callback`, set `GOOGLE_FRONTEND_URL` to the service URL
+     plus `/auth`, set `FRONTEND_URL` and `BACKEND_PUBLIC_URL` to the service URL,
+     and add `EMERGENT_LLM_KEY` for AI replies. Add Stripe/eSewa/Khalti merchant
+     credentials to enable those payment methods after the free offer ends.
+  Render's Starter web service and persistent media disk are paid resources;
+  review current pricing before creating them. The disk preserves uploaded
+  profile images across deploys; a free/ephemeral service does not.
 - **Dates**: `backend/lib/dates.py` — `today_iso(tz=None)`. The pod clock is
   UTC; anchor "today" server-side with this, never with client-side date math.
 - **Interactive check**: `cd /app/backend && python -c 'import server'` catches
