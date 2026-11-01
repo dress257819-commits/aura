@@ -80,6 +80,36 @@ FastAPI, async throughout. `python` is the app venv interpreter
   use `http://localhost:8001/api/auth/google/callback` as the authorized
   redirect URI and `http://localhost:3000/auth` as the frontend return URL.
   Keep the client secret private and never commit `.env`.
+- **Premium billing**: paid access is granted only after provider verification.
+  Stripe uses recurring monthly USD Price IDs; Nepal checkout uses eSewa and
+  Khalti in NPR, with each verified payment granting 30 days (renew manually).
+  Configure these values in `backend/.env` and use test credentials first:
+
+  ```dotenv
+  FRONTEND_URL=http://localhost:3000
+  BACKEND_PUBLIC_URL=https://your-public-api.example
+  NPR_PER_USD=135
+
+  STRIPE_SECRET_KEY=
+  STRIPE_PRICE_PRO=
+  STRIPE_PRICE_CREATOR=
+  STRIPE_WEBHOOK_SECRET=
+
+  ESEWA_ENV=sandbox
+  ESEWA_PRODUCT_CODE=
+  ESEWA_SECRET_KEY=
+
+  KHALTI_ENV=sandbox
+  KHALTI_SECRET_KEY=
+  ```
+
+  Create Stripe recurring monthly prices of $9 and $29 and set their Price IDs.
+  Register `POST /api/billing/webhooks/stripe` for checkout completion, paid
+  invoices, and subscription deletion; set its signing secret above.
+  `BACKEND_PUBLIC_URL` must be reachable by eSewa/Khalti for payment callbacks.
+  The NPR figures are calculated from the USD plan prices and `NPR_PER_USD`;
+  set that rate to the price you intend to charge. Bank transfer checkout is
+  not enabled.
 - **Dates**: `backend/lib/dates.py` — `today_iso(tz=None)`. The pod clock is
   UTC; anchor "today" server-side with this, never with client-side date math.
 - **Interactive check**: `cd /app/backend && python -c 'import server'` catches

@@ -8,6 +8,7 @@ import { UpgradeModal } from "@/components/shared/UpgradeModal";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { apiGet } from "@/lib/api";
+import { nepalPriceFor } from "@/lib/billing";
 import { useMe } from "@/lib/hooks";
 import { cn } from "@/lib/utils";
 import type { PlanInfo } from "@/lib/types";
@@ -19,6 +20,8 @@ export default function Pricing() {
     queryFn: () => apiGet<PlanInfo[]>("/plans"),
   });
   const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState("pro");
+  const [selectedRegion, setSelectedRegion] = useState<"international" | "nepal">("international");
 
   return (
     <div className="min-h-svh bg-background">
@@ -39,6 +42,7 @@ export default function Pricing() {
           {(plans ?? []).map((plan) => {
             const current = me?.plan === plan.key;
             const featured = plan.key === "pro";
+            const nepalPrice = nepalPriceFor(plan);
             return (
               <article
                 key={plan.key}
@@ -61,6 +65,11 @@ export default function Pricing() {
                   ${plan.price}
                   <span className="text-base font-normal text-muted-foreground">/mo</span>
                 </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {nepalPrice.estimated ? "Approx. " : ""}
+                  NPR {nepalPrice.amount.toLocaleString()} / 30 days in Nepal
+                  {nepalPrice.estimated ? " (at 135 NPR/USD)" : ""}
+                </p>
                 <ul className="mt-6 flex-1 space-y-2.5">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm">
@@ -77,10 +86,13 @@ export default function Pricing() {
                   <Button
                     className={cn("mt-7 w-full", featured && "shadow-lg shadow-indigo-500/25")}
                     variant={plan.price === 0 ? "outline" : "default"}
-                    onClick={() => setUpgradeOpen(true)}
+                    onClick={() => {
+                      setSelectedPlan(plan.key);
+                      setUpgradeOpen(true);
+                    }}
                     data-testid={`pricing-choose-${plan.key}`}
                   >
-                    {plan.price === 0 ? "Downgrade" : `Upgrade to ${plan.name}`}
+                    {plan.price === 0 ? "Switch to Free" : `Upgrade to ${plan.name}`}
                   </Button>
                 ) : (
                   <Link
@@ -99,12 +111,57 @@ export default function Pricing() {
           })}
         </div>
 
-        <p className="mx-auto mt-10 flex max-w-md items-center justify-center gap-2 text-center text-xs text-muted-foreground">
+        <section className="mt-12 grid gap-5 md:grid-cols-2" aria-label="Payment regions">
+          <article className="rounded-3xl border bg-card p-6">
+            <p className="label-caps text-primary">International payments</p>
+            <h2 className="mt-2 font-heading text-xl font-bold">Pay securely with Stripe</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Monthly subscriptions in USD. Stripe securely handles card details and recurring billing.
+            </p>
+            <Button
+              className="mt-5"
+              onClick={() => {
+                setSelectedRegion("international");
+                setSelectedPlan("pro");
+                setUpgradeOpen(true);
+              }}
+              data-testid="pricing-international-payment"
+            >
+              International checkout
+            </Button>
+          </article>
+          <article className="rounded-3xl border bg-card p-6">
+            <p className="label-caps text-primary">Nepal payments</p>
+            <h2 className="mt-2 font-heading text-xl font-bold">Pay with eSewa or Khalti</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Nepalese rupee pricing. Each payment activates 30 days of access; renew whenever you need.
+            </p>
+            <Button
+              className="mt-5"
+              variant="outline"
+              onClick={() => {
+                setSelectedRegion("nepal");
+                setSelectedPlan("pro");
+                setUpgradeOpen(true);
+              }}
+              data-testid="pricing-nepal-payment"
+            >
+              Nepal checkout · eSewa / Khalti
+            </Button>
+          </article>
+        </section>
+
+        <p className="mx-auto mt-8 flex max-w-md items-center justify-center gap-2 text-center text-xs text-muted-foreground">
           <ShieldCheck className="size-4" />
-          Demo checkout — upgrades apply instantly, no card needed in this preview.
+          Premium access is activated only after the selected payment provider verifies your payment.
         </p>
       </main>
-      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} />
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        initialPlan={selectedPlan}
+        initialRegion={selectedRegion}
+      />
       <Footer />
     </div>
   );

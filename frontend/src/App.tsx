@@ -5,6 +5,7 @@ import ProfilePage from "@/pages/ProfilePage";
 import Explore from "@/pages/Explore";
 import Leaderboard from "@/pages/Leaderboard";
 import Pricing from "@/pages/Pricing";
+import BillingComplete from "@/pages/BillingComplete";
 import DashboardHome from "@/pages/DashboardHome";
 import DashboardLinks from "@/pages/DashboardLinks";
 import DashboardShowcase from "@/pages/DashboardShowcase";
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/explore" element={<Explore />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/pricing" element={<Pricing />} />
+        <Route path="/billing/complete" element={<BillingComplete />} />
         <Route path="/dashboard" element={<DashboardHome />} />
         <Route path="/dashboard/links" element={<DashboardLinks />} />
         <Route path="/dashboard/showcase" element={<DashboardShowcase />} />

@@ -13,10 +13,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { apiGet, apiPatch, apiUpload, ApiError } from "@/lib/api";
+import { apiGet, apiPatch, apiPut, apiUpload, ApiError } from "@/lib/api";
 import { useMe } from "@/lib/hooks";
 import { FONT_OPTIONS, PROFILE_THEMES } from "@/lib/themes";
-import type { Appearance, Link, MeProfile, ProfileBundle } from "@/lib/types";
+import type { Appearance, ChatbotSettings, Link, MeProfile, ProfileBundle } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const PLAN_RANK: Record<string, number> = { free: 0, pro: 1, creator: 2 };
@@ -164,7 +164,7 @@ function ProfileMediaField({
                 <img
                   key={src}
                   src={src}
-                  alt="Profile cover preview"
+                  alt="Profile banner preview"
                   className="size-full object-cover"
                   onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
                 />
@@ -173,7 +173,7 @@ function ProfileMediaField({
               <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,var(--color-primary)_0%,transparent_55%)] opacity-25" />
             )}
             <span className="absolute bottom-3 left-3 rounded-full bg-background/80 px-2.5 py-1 text-xs font-medium backdrop-blur">
-              Profile cover
+              Profile banner
             </span>
           </div>
         ) : (
@@ -301,11 +301,23 @@ export default function DashboardCustomize() {
   const [availabilityUsername, setAvailabilityUsername] = useState("");
   const [upgradeOpen, setUpgradeOpen] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<string>();
+  const [upgradePlan, setUpgradePlan] = useState("pro");
   const [customInterestsOpen, setCustomInterestsOpen] = useState(false);
+  const [customCss, setCustomCss] = useState("");
+  const [aiInstructions, setAiInstructions] = useState("");
+  const [aiBoundaries, setAiBoundaries] = useState("");
 
   useEffect(() => {
-    if (me?.appearance) setAppearance(me.appearance);
+    if (me?.appearance) {
+      setAppearance(me.appearance);
+      setCustomCss(me.appearance.custom_css);
+    }
   }, [me?.appearance]);
+
+  useEffect(() => {
+    setAiInstructions(me?.chatbot?.instructions ?? "");
+    setAiBoundaries(me?.chatbot?.boundaries.join("\n") ?? "");
+  }, [me?.chatbot]);
 
   useEffect(() => {
     if (me && !profileDraft) setProfileDraft(draftFromProfile(me));
@@ -359,6 +371,7 @@ export default function DashboardCustomize() {
       queryClient.setQueryData(["me"], updated);
       setAppearance(updated.appearance);
       void queryClient.invalidateQueries({ queryKey: ["profile", updated.username] });
+      void queryClient.invalidateQueries({ queryKey: ["customize-profile-preview", updated.username] });
     },
     onError: (error) => {
       setAppearance(queryClient.getQueryData<MeProfile>(["me"])?.appearance ?? null);
@@ -367,6 +380,27 @@ export default function DashboardCustomize() {
         setUpgradeOpen(true);
       } else {
         toast.error(error instanceof ApiError ? error.detail : error instanceof Error ? error.message : "Couldn't save your appearance");
+      }
+    },
+  });
+
+  const saveAiSettings = useMutation({
+    mutationFn: () =>
+      apiPut<ChatbotSettings>("/me/ai-settings", {
+        instructions: aiInstructions,
+        boundaries: aiBoundaries.split(/\n|,/).map((value) => value.trim()).filter(Boolean).slice(0, 20),
+      }),
+    onSuccess: (chatbot) => {
+      queryClient.setQueryData<MeProfile>(["me"], (current) =>
+        current ? { ...current, chatbot } : current,
+      );
+      toast.success("Your AI twin settings are saved");
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.status === 403) {
+        requestUpgrade(error.detail, error.detail.toLowerCase().includes("creator") ? "creator" : "pro");
+      } else {
+        toast.error(error instanceof ApiError ? error.detail : "Couldn't save AI twin settings");
       }
     },
   });
@@ -415,7 +449,8 @@ export default function DashboardCustomize() {
     saveAppearance.mutate(changes);
   };
 
-  const requestUpgrade = (reason: string) => {
+  const requestUpgrade = (reason: string, plan = "pro") => {
+    setUpgradePlan(plan);
     setUpgradeReason(reason);
     setUpgradeOpen(true);
   };
@@ -567,15 +602,39 @@ export default function DashboardCustomize() {
                         onImageUrlChange={(avatar_url) => setProfileDraft({ ...profileDraft, avatar_url })}
                         onFileChange={(avatar_file) => setProfileDraft({ ...profileDraft, avatar_file })}
                       />
-                      <ProfileMediaField
-                        label="Cover image"
-                        description="Set the image or video visitors see at the top of your page."
-                        imageUrl={profileDraft.cover_url}
-                        file={profileDraft.cover_file}
-                        kind="cover"
-                        onImageUrlChange={(cover_url) => setProfileDraft({ ...profileDraft, cover_url })}
-                        onFileChange={(cover_file) => setProfileDraft({ ...profileDraft, cover_file })}
-                      />
+                      {me && me.plan !== "free" ? (
+                        <ProfileMediaField
+                          label="Profile banner"
+                          description="Shown beneath your profile photo. Images and video are supported."
+                          imageUrl={profileDraft.cover_url}
+                          file={profileDraft.cover_file}
+                          kind="cover"
+                          onImageUrlChange={(cover_url) => setProfileDraft({ ...profileDraft, cover_url })}
+                          onFileChange={(cover_file) => setProfileDraft({ ...profileDraft, cover_file })}
+                        />
+                      ) : (
+                        <div
+                          className="flex min-h-40 flex-col justify-between rounded-2xl border border-dashed border-border/70 bg-muted/20 p-4"
+                          data-testid="profile-banner-upgrade"
+                        >
+                          <div>
+                            <p className="flex items-center gap-2 text-sm font-semibold">
+                              <Crown className="size-4 text-primary" /> Profile banner
+                            </p>
+                            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                              Add an image or video below your profile photo with a Pro or Creator plan.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="mt-4 w-fit rounded-full"
+                            onClick={() => requestUpgrade("Profile banners are available on Pro and Creator plans")}
+                          >
+                            Unlock profile banner
+                          </Button>
+                        </div>
+                      )}
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-2">
@@ -724,7 +783,7 @@ export default function DashboardCustomize() {
                         aria-pressed={active}
                         onClick={() => {
                           if (!unlocked) {
-                            requestUpgrade(`The “${theme.name}” theme is available on the ${requiredPlan} plan.`);
+                            requestUpgrade(`The “${theme.name}” theme is available on the ${requiredPlan} plan.`, requiredPlan);
                             return;
                           }
                           if (!active) updateAppearance({ theme: theme.key, accent: theme.accent });
@@ -787,7 +846,7 @@ export default function DashboardCustomize() {
                           aria-pressed={active}
                           onClick={() => {
                             if (!unlocked) {
-                              requestUpgrade(`${font.name} is available on the ${requiredPlan} plan.`);
+                              requestUpgrade(`${font.name} is available on the ${requiredPlan} plan.`, requiredPlan);
                               return;
                             }
                             if (!active) updateAppearance({ font: key });
@@ -828,7 +887,7 @@ export default function DashboardCustomize() {
                           aria-pressed={active}
                           onClick={() => {
                             if (!unlocked) {
-                              requestUpgrade(`${style.name} card design is available on the ${style.plan} plan.`);
+                              requestUpgrade(`${style.name} card design is available on the ${style.plan} plan.`, style.plan);
                               return;
                             }
                             if (!active) updateAppearance({ card_style: style.key });
@@ -973,10 +1032,116 @@ export default function DashboardCustomize() {
               </CardContent>
             </Card>
 
+            <Card className="border-border/70 bg-card shadow-sm">
+              <CardContent className="space-y-4 p-5 sm:p-6">
+                <div>
+                  <p className="flex items-center gap-2 font-heading text-lg font-bold">
+                    <Paintbrush className="size-4 text-primary" /> Custom CSS
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Add scoped visual rules to your profile and link cards.
+                  </p>
+                </div>
+                {me?.plan === "creator" ? (
+                  <>
+                    <Textarea
+                      value={customCss}
+                      onChange={(event) => setCustomCss(event.target.value)}
+                      rows={7}
+                      maxLength={5000}
+                      placeholder={".aura-profile { color: #f5f3ff; }\n.aura-profile .aura-link-card { border-radius: 24px; }"}
+                      aria-label="Custom profile CSS"
+                      data-testid="customize-custom-css"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Only scoped color, border, shadow, and typography rules are accepted.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saveAppearance.isPending || customCss === appearance?.custom_css}
+                      onClick={() => updateAppearance({ custom_css: customCss })}
+                      data-testid="customize-custom-css-save"
+                    >
+                      {saveAppearance.isPending ? "Saving…" : "Save custom CSS"}
+                    </Button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => requestUpgrade("Custom profile CSS is included with Creator.", "creator")}
+                    className="flex w-full items-center gap-3 rounded-xl border border-dashed p-4 text-left transition-colors hover:border-primary/40"
+                    data-testid="customize-custom-css-locked"
+                  >
+                    <Lock className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Unlock custom CSS with Creator</span>
+                  </button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/70 bg-card shadow-sm">
+              <CardContent className="space-y-4 p-5 sm:p-6">
+                <div>
+                  <p className="font-heading text-lg font-bold">AI twin knowledge</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Give your AI twin extra approved details and topics it should avoid.
+                  </p>
+                </div>
+                {me?.plan === "creator" ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="customize-ai-instructions">Approved notes for your AI twin</Label>
+                      <Textarea
+                        id="customize-ai-instructions"
+                        value={aiInstructions}
+                        onChange={(event) => setAiInstructions(event.target.value)}
+                        maxLength={1000}
+                        rows={4}
+                        placeholder="Add facts visitors may ask about, such as your current projects or how to work with you."
+                        data-testid="customize-ai-instructions"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="customize-ai-boundaries">Topics to avoid</Label>
+                      <Textarea
+                        id="customize-ai-boundaries"
+                        value={aiBoundaries}
+                        onChange={(event) => setAiBoundaries(event.target.value)}
+                        maxLength={1000}
+                        rows={3}
+                        placeholder="One topic per line"
+                        data-testid="customize-ai-boundaries"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saveAiSettings.isPending}
+                      onClick={() => saveAiSettings.mutate()}
+                      data-testid="customize-ai-settings-save"
+                    >
+                      {saveAiSettings.isPending ? "Saving…" : "Save AI twin settings"}
+                    </Button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => requestUpgrade("Custom AI instructions and boundaries are included with Creator.", "creator")}
+                    className="flex w-full items-center gap-3 rounded-xl border border-dashed p-4 text-left transition-colors hover:border-primary/40"
+                    data-testid="customize-ai-settings-locked"
+                  >
+                    <Lock className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground">Unlock custom AI instructions with Creator</span>
+                  </button>
+                )}
+              </CardContent>
+            </Card>
+
             {me?.plan !== "creator" && (
               <button
                 type="button"
-                onClick={() => requestUpgrade("Unlock every theme and font to make your AURA page completely your own.")}
+                onClick={() => requestUpgrade("Unlock every theme and font to make your AURA page completely your own.", "creator")}
                 className="flex w-full items-center gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-4 text-left transition-colors hover:border-primary/30 hover:bg-primary/10"
               >
                 <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -1065,7 +1230,12 @@ export default function DashboardCustomize() {
         </div>
       </div>
 
-      <UpgradeModal open={upgradeOpen} onOpenChange={setUpgradeOpen} reason={upgradeReason} />
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        reason={upgradeReason}
+        initialPlan={upgradePlan}
+      />
     </DashboardShell>
   );
 }

@@ -34,6 +34,7 @@ export function DashboardShell({ children, active }: { children: ReactNode; acti
     queryFn: () => apiGet<MessageCounts>("/me/messages/count"),
     enabled: !!me,
     staleTime: 30_000,
+    refetchInterval: 30_000,
   });
   const pendingCount = pendingMessages?.pending ?? 0;
 
@@ -161,7 +162,7 @@ export function DashboardShell({ children, active }: { children: ReactNode; acti
             <p className="mt-0.5 text-xs text-muted-foreground">
               {me.plan === "free" && "5 links, 3 themes — upgrade for the full studio"}
               {me.plan === "pro" && "15 links, all core themes & glass controls"}
-              {me.plan === "creator" && "Unlimited links, custom CSS & the Luxe theme"}
+              {me.plan === "creator" && "100 links, custom CSS & the Luxe theme"}
             </p>
             {me.plan !== "creator" && (
               <Button

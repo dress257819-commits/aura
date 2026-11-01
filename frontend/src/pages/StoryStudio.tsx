@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { UpgradeModal } from "@/components/shared/UpgradeModal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -408,6 +409,7 @@ function drawStory(
 export default function StoryStudio() {
   const location = useLocation();
   const { data: me } = useMe();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const draft = isStoryDraft(location.state) ? location.state : {};
   const hasAnswerDraft = typeof draft.question === "string" && typeof draft.answer === "string";
   const [template, setTemplate] = useState<StoryTemplate>(hasAnswerDraft ? "answer" : "invite");
@@ -482,6 +484,10 @@ export default function StoryStudio() {
   }, [answer, avatar, displayName, headline, question, template, theme, username]);
 
   const downloadStory = () => {
+    if (me?.plan !== "creator") {
+      setUpgradeOpen(true);
+      return;
+    }
     if (!storyBlob) {
       toast.error("Your story image could not be created. Please try again.");
       return;
@@ -497,6 +503,10 @@ export default function StoryStudio() {
   };
 
   const shareStory = () => {
+    if (me?.plan !== "creator") {
+      setUpgradeOpen(true);
+      return;
+    }
     if (!storyBlob) {
       toast.error("Your story image could not be created. Please try again.");
       return;
@@ -667,6 +677,11 @@ export default function StoryStudio() {
             </div>
 
             <div className="space-y-3 border-t pt-5">
+              {me?.plan !== "creator" && (
+                <p className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
+                  Preview and design your story for free. Creator unlocks 1080 × 1920 PNG downloads and sharing.
+                </p>
+              )}
               <Button
                 className="w-full"
                 size="lg"
@@ -735,6 +750,12 @@ export default function StoryStudio() {
           </aside>
         </div>
       </div>
+      <UpgradeModal
+        open={upgradeOpen}
+        onOpenChange={setUpgradeOpen}
+        initialPlan="creator"
+        reason="1080 × 1920 Story Studio downloads and sharing are included with Creator."
+      />
     </DashboardShell>
   );
 }

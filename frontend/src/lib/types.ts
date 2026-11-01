@@ -46,9 +46,19 @@ export interface MeProfile {
   daily_question: string;
   music: MusicTrack[];
   appearance: Appearance;
+  chatbot?: ChatbotSettings;
   leaderboard_visible: boolean;
   plan: string;
   created_at: string;
+}
+
+export interface ChatbotSettings {
+  enabled: boolean;
+  name: string;
+  tone: "witty" | "professional" | "genz" | "whimsical";
+  greeting: string;
+  boundaries: string[];
+  instructions: string;
 }
 
 export interface LeaderboardEntry {
@@ -162,8 +172,21 @@ export interface PlanInfo {
   key: string;
   name: string;
   price: number;
+  nepal_price?: number;
   tagline: string;
   features: string[];
+}
+
+export interface BillingOptions {
+  international: { stripe: boolean };
+  nepal: { esewa: boolean; khalti: boolean };
+}
+
+export interface CheckoutResponse {
+  payment_id: string;
+  provider: "stripe" | "esewa" | "khalti";
+  checkout_url: string;
+  form_fields: Record<string, string>;
 }
 
 export interface ExploreCard {

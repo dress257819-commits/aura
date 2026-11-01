@@ -6,6 +6,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends
 
 from lib.db import db
+from lib.plans import appearance_for_plan, effective_plan
 from lib.session import get_optional_user
 from models.models import LeaderboardResponse, User, utcnow
 
@@ -56,8 +57,8 @@ async def explore(
             "interests": d.get("interests", [])[:4],
             "followers": followers,
             "following": d["id"] in followed_ids,
-            "plan": d.get("plan", "free"),
-            "theme": d.get("appearance", {}).get("theme", "aurora"),
+            "plan": effective_plan(d),
+            "theme": appearance_for_plan(d.get("appearance", {}), effective_plan(d))["theme"],
         })
     cards.sort(key=lambda c: (c["plan"] != "creator", c["plan"] != "pro", -c["followers"]))
     return cards

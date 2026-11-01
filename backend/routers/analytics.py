@@ -6,6 +6,7 @@ from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException
 
 from lib.db import db
+from lib.plans import limits_for
 from lib.session import get_current_user
 from models.models import (
     AnalyticsSummary, DaySeriesPoint, EventCreate, TopLink, User, utcnow,
@@ -41,7 +42,8 @@ async def my_analytics(user: User = Depends(get_current_user)):
 
     # 14-day series anchored server-side (pod clock is UTC)
     days: list[DaySeriesPoint] = []
-    for offset in range(WINDOW_DAYS - 1, -1, -1):
+    advanced_analytics = user.plan in {"pro", "creator"}
+    for offset in range(WINDOW_DAYS - 1, -1, -1) if advanced_analytics else []:
         day_start = (utcnow() - timedelta(days=offset)).replace(
             hour=0, minute=0, second=0, microsecond=0
         )
@@ -66,7 +68,7 @@ async def my_analytics(user: User = Depends(get_current_user)):
         await db.links.find({"user_id": user.id})
         .sort("clicks", -1)
         .to_list(5)
-    )
+    ) if advanced_analytics else []
     top_links = [TopLink(id=l["id"], title=l["title"], clicks=l["clicks"]) for l in links]
 
     pending = await db.messages.count_documents(

@@ -62,6 +62,8 @@ class User(BaseModel):
     chatbot: ChatbotSettings = Field(default_factory=ChatbotSettings)
     leaderboard_visible: bool = False
     plan: Literal["free", "pro", "creator"] = "free"
+    plan_expires_at: Optional[datetime] = None
+    stripe_subscription_id: Optional[str] = None
     created_at: datetime = Field(default_factory=utcnow)
 
 
@@ -326,12 +328,22 @@ class PlanInfo(BaseModel):
     key: str
     name: str
     price: int
+    nepal_price: int
     tagline: str
     features: List[str]
 
 
-class UpgradeCreate(BaseModel):
-    plan: Literal["free", "pro", "creator"]
+class CheckoutCreate(BaseModel):
+    plan: Literal["pro", "creator"]
+    region: Literal["international", "nepal"]
+    provider: Literal["stripe", "esewa", "khalti"]
+
+
+class CheckoutResponse(BaseModel):
+    payment_id: str
+    provider: str
+    checkout_url: str
+    form_fields: dict[str, str] = Field(default_factory=dict)
 
 
 # ---------- profile bundle ----------

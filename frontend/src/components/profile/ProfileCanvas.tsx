@@ -31,6 +31,44 @@ interface ProfileCanvasProps {
   preview?: boolean; // inside the phone simulator — no tracking, no navigation
 }
 
+function ProfileBanner({
+  profile,
+  className,
+}: {
+  profile: ProfileBundle["profile"];
+  className?: string;
+}) {
+  if (profile.plan === "free" || !profile.cover_url) return null;
+
+  const isVideo = /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(profile.cover_url);
+  return (
+    <section
+      className={cn("relative mt-5 aspect-[3/1] max-h-40 overflow-hidden rounded-2xl", className)}
+      aria-label={`${profile.name}'s profile banner`}
+      data-testid="profile-banner-area"
+    >
+      {isVideo ? (
+        <video
+          src={profile.cover_url}
+          className="size-full object-cover"
+          autoPlay
+          muted
+          loop
+          playsInline
+          data-testid="profile-cover-video"
+        />
+      ) : (
+        <img
+          src={profile.cover_url}
+          alt=""
+          className="size-full object-cover"
+          data-testid="profile-cover"
+        />
+      )}
+    </section>
+  );
+}
+
 let activeGalleryItem: GalleryItem | null = null;
 const galleryViewerSubscribers = new Set<() => void>();
 
@@ -183,14 +221,39 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
       } catch (error) {
         if (!(error instanceof ApiError) || error.status !== 401 || !localMe) throw error;
 
-        const localFollowing = isLocallyFollowing(localMe.id, profile.username);
-        const nextFollowing = !localFollowing;
-        setLocalFollowing(localMe.id, profile.username, nextFollowing);
+        const optimistic = queryClient.getQueryData<ProfileBundle>(["profile", profile.username]);
+        const nextFollowing = optimistic?.following ?? isFollowing;
         return {
           following: nextFollowing,
-          followers: followers + Number(nextFollowing) - Number(localFollowing),
+          followers: optimistic?.followers ?? followers,
         };
       }
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["profile", profile.username] });
+      const previous = queryClient.getQueryData<ProfileBundle>(["profile", profile.username]);
+      const previousLocalFollowing = localMe
+        ? isLocallyFollowing(localMe.id, profile.username)
+        : undefined;
+      const currentFollowing = previous?.following ?? isFollowing;
+      const nextFollowing = !currentFollowing;
+
+      if (localMe) setLocalFollowing(localMe.id, profile.username, nextFollowing);
+      queryClient.setQueryData<ProfileBundle>(
+        ["profile", profile.username],
+        (current) => current
+          ? {
+              ...current,
+              following: nextFollowing,
+              followers: Math.max(
+                0,
+                current.followers + Number(nextFollowing) - Number(currentFollowing),
+              ),
+            }
+          : current,
+      );
+
+      return { previous, previousLocalFollowing };
     },
     onSuccess: async (result) => {
       if (localMe) setLocalFollowing(localMe.id, profile.username, result.following);
@@ -202,7 +265,13 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
       );
       await queryClient.invalidateQueries({ queryKey: ["profile", profile.username] });
     },
-    onError: (err) => {
+    onError: (err, _variables, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["profile", profile.username], context.previous);
+      }
+      if (localMe && context?.previousLocalFollowing !== undefined) {
+        setLocalFollowing(localMe.id, profile.username, context.previousLocalFollowing);
+      }
       if (err instanceof ApiError && err.status === 401) {
         toast.error("Sign in to follow creators");
         navigate("/auth");
@@ -259,7 +328,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
           </span>
         </header>
 
-        <main className={cn("relative mx-auto max-w-5xl px-3 pb-12 sm:px-6", preview ? "pt-1" : "pt-5 sm:pt-8")}>
+        <main className={cn("aura-profile relative mx-auto max-w-5xl px-3 pb-12 sm:px-6", preview ? "pt-1" : "pt-5 sm:pt-8")}>
+          {appearance.custom_css && <style>{appearance.custom_css}</style>}
           <article
             className="overflow-hidden rounded-[1.75rem] border shadow-[0_24px_70px_rgba(54,44,32,0.12)]"
             style={{ background: theme.card, borderColor: theme.cardBorder }}
@@ -282,20 +352,12 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
             </div>
 
             <section className="relative h-40 overflow-hidden sm:h-56" data-testid="profile-cover-area">
-              {profile.cover_url ? (
-                /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(profile.cover_url) ? (
-                  <video src={profile.cover_url} className="size-full object-cover" autoPlay muted loop playsInline data-testid="profile-cover-video" />
-                ) : (
-                  <img src={profile.cover_url} alt="" className="size-full object-cover" data-testid="profile-cover" />
-                )
-              ) : (
-                <div
-                  className="size-full"
-                  style={{
-                    background: "radial-gradient(ellipse at 72% 20%, rgba(197,164,105,.34), transparent 40%), linear-gradient(125deg, #211e19 8%, #55462d 52%, #473a2d 100%)",
-                  }}
-                />
-              )}
+              <div
+                className="size-full"
+                style={{
+                  background: "radial-gradient(ellipse at 72% 20%, rgba(197,164,105,.34), transparent 40%), linear-gradient(125deg, #211e19 8%, #55462d 52%, #473a2d 100%)",
+                }}
+              />
               <div className="absolute inset-0" style={{ background: theme.coverScrim }} />
               <div className="absolute -right-7 -top-20 size-56 rounded-full border border-white/10" aria-hidden />
               <div className="absolute right-8 top-5 size-36 rounded-full border border-white/10" aria-hidden />
@@ -319,17 +381,25 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                 )}
                 <div className="pb-1 text-white">
                   <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/65">AURA creator</p>
-                  <p className="mt-1 text-xs font-medium">@{profile.username}</p>
+                  <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium">
+                    @{profile.username}
+                    {profile.plan !== "free" && (
+                      <BadgeCheck className="size-3.5" style={{ color: "#1d9bf0" }} aria-label={`${profile.plan} plan badge`} />
+                    )}
+                  </p>
+                  <p className="mt-1 text-[10px] text-white/65" data-testid="profile-follower-count">
+                    {followers} {followers === 1 ? "follower" : "followers"}
+                  </p>
                 </div>
               </div>
             </section>
+            <ProfileBanner profile={profile} className="mx-5 sm:mx-7" />
 
             <div className="space-y-6 px-5 pb-6 pt-5 sm:px-7 sm:pb-7">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
-                  <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl" data-testid="profile-name">
-                    {profile.name}
-                    <BadgeCheck className="ml-1.5 inline size-5 align-middle" style={{ color: "#1d9bf0" }} aria-label="Verified creator" />
+                  <h1 className="break-words font-heading text-2xl font-bold tracking-tight sm:text-3xl" data-testid="profile-name">
+                    <span>{profile.name}</span>
                   </h1>
                   {profile.bio && (
                     <p className="mt-1.5 max-w-2xl text-sm leading-6" style={{ color: theme.muted }} data-testid="profile-bio">
@@ -485,7 +555,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                           key={link.id}
                           type="button"
                           onClick={() => clickLink(link.id, link.url)}
-                          className="group flex min-h-14 items-center gap-3 rounded-2xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
+                          className="aura-link-card group flex min-h-14 items-center gap-3 rounded-2xl border p-3 text-left transition-all hover:-translate-y-0.5 hover:shadow-md"
                           style={{ ...cardStyle, background: "transparent" }}
                           data-testid={`link-card-${link.id}`}
                         >
@@ -637,11 +707,12 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
         )}
 
         <main className={cn(
-          "relative mx-auto grid w-full max-w-[1440px] items-start gap-4 pb-24",
+          "aura-profile relative mx-auto grid w-full max-w-[1440px] items-start gap-4 pb-24",
           preview
             ? "grid-cols-1 px-3 pt-9"
             : "grid-cols-1 px-4 pt-5 sm:gap-5 sm:px-6 lg:grid-cols-12 lg:px-8",
         )}>
+          {appearance.custom_css && <style>{appearance.custom_css}</style>}
           <header className={cn("flex items-center justify-between", !preview && "lg:col-span-12")}>
             <Link
               to="/"
@@ -719,16 +790,20 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                   Online
                 </span>
                 <h1 className={cn(
-                  "mt-5 flex flex-wrap items-center gap-x-2 break-words font-extrabold leading-[0.98] tracking-[-0.06em]",
+                  "mt-5 break-words font-extrabold leading-[0.98] tracking-[-0.06em]",
                   preview ? "text-2xl" : "text-4xl sm:text-5xl lg:text-[3.6rem]",
                 )} data-testid="profile-name">
                   <span className="text-white">{profile.name}</span>
-                  <BadgeCheck className="size-5 shrink-0 align-middle sm:size-6" style={{ color: "#1d9bf0" }} aria-label="Verified creator" />
                 </h1>
                 <p className="mt-3 text-sm font-semibold text-white/85">
                   {profile.interests.slice(0, 3).join(" · ") || "Creator · Explorer · Dreamer"}
                 </p>
-                <p className="mt-1 font-mono text-xs text-white/45" data-testid="profile-username">@{profile.username}</p>
+                <p className="mt-1 inline-flex items-center gap-1 font-mono text-xs text-white/45" data-testid="profile-username">
+                  @{profile.username}
+                  {profile.plan !== "free" && (
+                    <BadgeCheck className="size-3.5 shrink-0" style={{ color: "#1d9bf0" }} aria-label={`${profile.plan} plan badge`} />
+                  )}
+                </p>
                 <p className={cn("max-w-xl text-sm leading-6 text-white/65 sm:text-base sm:leading-7", preview ? "mt-3" : "mt-4")} data-testid="profile-bio">
                   {profile.bio || `A little about ${profile.name} — explore my links, projects, and latest updates.`}
                 </p>
@@ -745,6 +820,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                         "inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] text-white/65",
                         preview ? "min-w-0 gap-1 px-2 py-1.5 text-[11px]" : "min-w-24 px-3 py-2 text-xs",
                       )}
+                      data-testid={stat.label === "Followers" ? "profile-follower-count" : undefined}
                     >
                       <span className="font-semibold text-white">{stat.value}</span> {stat.label}
                     </span>
@@ -847,6 +923,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                 </div>
               </div>
             </div>
+            <ProfileBanner profile={profile} className={preview ? "mt-1" : "lg:max-w-xl"} />
           </section>
 
           <section className={cn("rounded-[1.75rem] border p-4 backdrop-blur-xl sm:p-6", !preview && "lg:col-span-4")} style={hubPanelStyle} data-testid="creator-hub-about">
@@ -1151,30 +1228,9 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
         </div>
       )}
 
-      {/* cover */}
+      {/* Header backdrop */}
       <div className={cn("relative h-48 overflow-hidden sm:h-56", !preview && "lg:h-64")}>
-        {profile.cover_url ? (
-          /\.(mp4|webm|mov|m4v)(?:[?#].*)?$/i.test(profile.cover_url) ? (
-            <video
-              src={profile.cover_url}
-              className="size-full object-cover"
-              autoPlay
-              muted
-              loop
-              playsInline
-              data-testid="profile-cover-video"
-            />
-          ) : (
-          <img
-            src={profile.cover_url}
-            alt=""
-            className="h-full w-full object-cover"
-            data-testid="profile-cover"
-          />
-          )
-        ) : (
-          <div className="h-full w-full bg-gradient-to-br from-indigo-600/60 via-violet-600/50 to-pink-500/50" />
-        )}
+        <div className="size-full bg-gradient-to-br from-indigo-600/60 via-violet-600/50 to-pink-500/50" />
         <div className="absolute inset-0" style={{ background: theme.coverScrim, backdropFilter: "blur(2px)" }} />
         <div
           className="pointer-events-none absolute -bottom-12 left-[-12%] h-28 w-[124%] rounded-[50%_50%_0_0/75%_75%_0_0] blur-2xl"
@@ -1210,14 +1266,19 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
             </div>
           )}
           <h1
-            className="mt-3 flex flex-wrap items-center gap-2 text-2xl font-bold tracking-tight"
+            className="mt-3 break-words text-2xl font-bold tracking-tight"
             data-testid="profile-name"
           >
-            {profile.name}
-            <BadgeCheck className="size-5 shrink-0" style={{ color: "#1d9bf0" }} aria-label="Verified creator" />
+            <span>{profile.name}</span>
           </h1>
-          <p className="font-mono text-sm" style={{ color: theme.muted }} data-testid="profile-username">
+          <p className="inline-flex items-center gap-1 font-mono text-sm" style={{ color: theme.muted }} data-testid="profile-username">
             @{profile.username}
+            {profile.plan !== "free" && (
+              <BadgeCheck className="size-4 shrink-0" style={{ color: "#1d9bf0" }} aria-label={`${profile.plan} plan badge`} />
+            )}
+          </p>
+          <p className="mt-1 text-xs" style={{ color: theme.muted }} data-testid="profile-follower-count">
+            {followers} {followers === 1 ? "follower" : "followers"}
           </p>
           {profile.bio && (
             <p className="mt-2 max-w-md text-sm leading-relaxed" style={{ color: theme.text }} data-testid="profile-bio">
@@ -1246,6 +1307,8 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
             ))}
           </div>
         </div>
+
+        <ProfileBanner profile={profile} className="mx-auto w-full max-w-2xl" />
 
         {/* actions */}
         <div className="flex items-center justify-center gap-2" data-testid="profile-actions-row">

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from lib.db import db
+from lib.plans import effective_plan, limits_for
 from lib.session import get_current_user
 from models.models import AiSettingsUpdate, ChatCreate, User, utcnow
 
@@ -27,8 +28,9 @@ TONE_GUIDES = {
 def build_system_prompt(owner: dict) -> str:
     chatbot = owner.get("chatbot", {})
     tone = chatbot.get("tone", "genz")
-    boundaries = chatbot.get("boundaries", [])
-    instructions = chatbot.get("instructions", "")
+    premium_ai = limits_for(effective_plan(owner))["ai_customization"]
+    boundaries = chatbot.get("boundaries", []) if premium_ai else []
+    instructions = chatbot.get("instructions", "") if premium_ai else ""
 
     interests = ", ".join(owner.get("interests", [])) or "not listed"
     links = "; ".join(
@@ -70,6 +72,12 @@ HARD RULES:
 
 @router.put("/me/ai-settings")
 async def update_ai_settings(input: AiSettingsUpdate, user: User = Depends(get_current_user)):
+    has_custom_data = bool(input.instructions and input.instructions.strip()) or bool(input.boundaries)
+    if has_custom_data and not limits_for(user.plan)["ai_customization"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Custom AI instructions and boundaries are available on the Creator plan",
+        )
     chatbot = user.chatbot.model_dump()
     for field in ("enabled", "name", "tone", "greeting", "boundaries", "instructions"):
         value = getattr(input, field)

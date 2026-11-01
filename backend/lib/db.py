@@ -69,6 +69,11 @@ INDEXES: dict[str, list[IndexModel]] = {
         IndexModel([("session_id", ASCENDING), ("created_at", ASCENDING)], name="session_history"),
         IndexModel([("owner_id", ASCENDING), ("created_at", DESCENDING)], name="owner_recent"),
     ],
+    "payments": [
+        IndexModel([("id", ASCENDING)], name="payment_id", unique=True),
+        IndexModel([("user_id", ASCENDING), ("created_at", DESCENDING)], name="user_created"),
+        IndexModel([("provider_ref", ASCENDING)], name="provider_ref", sparse=True),
+    ],
 }
 
 

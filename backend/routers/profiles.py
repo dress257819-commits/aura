@@ -1,5 +1,6 @@
 """Public profiles + owner profile editing + gallery + follows."""
 
+import logging
 import re
 import uuid
 
@@ -9,7 +10,7 @@ from pymongo import ASCENDING
 from pymongo.errors import DuplicateKeyError
 
 from lib.db import db
-from lib.plans import limits_for
+from lib.plans import appearance_for_plan, effective_plan, limits_for
 from lib.session import get_current_user, get_optional_user
 from models.models import (
     Appearance,
@@ -28,6 +29,7 @@ from models.models import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 RESERVED = {
     "dashboard", "auth", "login", "signup", "u", "api", "explore", "leaderboard", "pricing",
@@ -37,6 +39,13 @@ RESERVED = {
 
 def public_profile(doc: dict) -> PublicProfile:
     chatbot = doc.get("chatbot", {})
+    plan = effective_plan(doc)
+    appearance = appearance_for_plan(doc.get("appearance", {}), plan)
+    try:
+        appearance["custom_css"] = sanitize_custom_css(appearance.get("custom_css", ""))
+    except HTTPException:
+        logger.warning("Ignoring invalid stored custom CSS for user %s", doc.get("id"))
+        appearance["custom_css"] = ""
     return PublicProfile(
         id=doc["id"],
         username=doc["username"],
@@ -48,8 +57,8 @@ def public_profile(doc: dict) -> PublicProfile:
         interests=doc.get("interests", []),
         daily_question=doc.get("daily_question", ""),
         music=[MusicTrack(**m) for m in doc.get("music", [])],
-        appearance=Appearance(**doc.get("appearance", {})),
-        plan=doc.get("plan", "free"),
+        appearance=Appearance(**appearance),
+        plan=plan,
         created_at=doc["created_at"],
         chatbot={
             "enabled": chatbot.get("enabled", True),
@@ -80,6 +89,67 @@ class AppearanceUpdate(BaseModel):
     glass: int | None = None
     effects: bool | None = None
     custom_css: str | None = None
+
+
+CUSTOM_CSS_SELECTOR = re.compile(
+    r"\.aura-profile(?:\s+(?:\.aura-link-card|h1|h2|p)(?::hover)?)?"
+)
+CUSTOM_CSS_PROPERTIES = {
+    "color",
+    "background-color",
+    "border-color",
+    "border-radius",
+    "box-shadow",
+    "font-weight",
+    "letter-spacing",
+    "text-transform",
+}
+
+
+def sanitize_custom_css(value: str) -> str:
+    css = value.strip()
+    if len(css) > 5000:
+        raise HTTPException(status_code=422, detail="Custom CSS must be 5,000 characters or fewer")
+    if not css:
+        return ""
+
+    rules: list[str] = []
+    position = 0
+    while position < len(css):
+        match = re.match(r"\s*([^{}]+)\{([^{}]*)\}", css[position:])
+        if not match:
+            raise HTTPException(status_code=422, detail="Use valid, scoped CSS rules")
+        selector, declarations = match.groups()
+        selectors = [item.strip() for item in selector.split(",")]
+        if any(not CUSTOM_CSS_SELECTOR.fullmatch(item) for item in selectors):
+            raise HTTPException(
+                status_code=422,
+                detail="Custom CSS selectors must stay within .aura-profile",
+            )
+
+        safe_declarations = []
+        for declaration in declarations.split(";"):
+            if not declaration.strip():
+                continue
+            property_name, separator, property_value = declaration.partition(":")
+            name = property_name.strip().lower()
+            val = property_value.strip()
+            if (
+                not separator
+                or name not in CUSTOM_CSS_PROPERTIES
+                or not re.fullmatch(r"[a-zA-Z0-9#(),.%\s-]+", val)
+                or re.search(r"url|expression|javascript", val, re.IGNORECASE)
+            ):
+                raise HTTPException(
+                    status_code=422,
+                    detail="Custom CSS supports scoped color, border, shadow, and typography properties only",
+                )
+            safe_declarations.append(f"{name}: {val}")
+        if safe_declarations:
+            rules.append(f"{', '.join(selectors)} {{{'; '.join(safe_declarations)}}}")
+        position += match.end()
+
+    return "\n".join(rules)
 
 
 # ---------- public bundle ----------
@@ -155,7 +225,13 @@ async def update_profile(input: ProfileUpdate, user: User = Depends(get_current_
     for field, max_len in limits.items():
         value = getattr(input, field)
         if value is not None:
-            updates[field] = value.strip()[:max_len]
+            value = value.strip()[:max_len]
+            if field == "cover_url" and user.plan == "free" and value and value != user.cover_url:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Profile banners are available on Pro and Creator plans",
+                )
+            updates[field] = value
     if input.interests is not None:
         updates["interests"] = [i.strip()[:24] for i in input.interests[:8] if i.strip()]
     if input.music is not None:
@@ -210,7 +286,7 @@ async def update_appearance(input: AppearanceUpdate, user: User = Depends(get_cu
     if input.custom_css is not None:
         if not limits["custom_css"] and input.custom_css.strip():
             raise HTTPException(status_code=403, detail="Custom CSS is a Creator feature")
-        appearance["custom_css"] = input.custom_css[:5000]
+        appearance["custom_css"] = sanitize_custom_css(input.custom_css)
 
     await db.users.update_one({"id": user.id}, {"$set": {"appearance": appearance}})
     doc = await db.users.find_one({"id": user.id})

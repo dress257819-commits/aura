@@ -479,6 +479,12 @@
   color: #342d3b !important;
 }
 
+.creator-hub-light input::placeholder,
+.creator-hub-light textarea::placeholder {
+  color: rgb(52 45 59 / 60%) !important;
+  opacity: 1;
+}
+
 .creator-hub-light .creator-hub-logo-mark {
   color: #fff !important;
 }

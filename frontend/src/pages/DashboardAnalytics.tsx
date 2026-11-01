@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowUpRight, BarChart3, Eye, Heart, Inbox, Link2, LoaderCircle,
+  ArrowUpRight, BarChart3, Crown, Eye, Heart, Inbox, Link2, LoaderCircle,
   MessageCircle, MousePointerClick, RefreshCw, Share2, Vote,
 } from "lucide-react";
 import {
@@ -45,6 +45,7 @@ export default function DashboardAnalytics() {
     retry: false,
   });
   const analytics = analyticsQuery.data;
+  const advancedAnalytics = me?.plan === "pro" || me?.plan === "creator";
   const totals = analytics?.totals;
   const days = analytics?.days ?? [];
   const peakDay = days.reduce(
@@ -161,6 +162,7 @@ export default function DashboardAnalytics() {
               ))}
             </section>
 
+            {advancedAnalytics ? (
             <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(300px,1fr)]">
               <Card className="min-w-0 border-border/70 shadow-sm">
                 <CardContent className="p-4 sm:p-5">
@@ -291,6 +293,26 @@ export default function DashboardAnalytics() {
                 </CardContent>
               </Card>
             </div>
+            ) : (
+              <Card className="border-primary/20 bg-primary/[0.03]">
+                <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+                      <Crown className="size-5" />
+                    </span>
+                    <div>
+                      <h2 className="font-heading font-bold">Unlock advanced analytics</h2>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Pro adds 14-day engagement trends, daily activity, and your top-performing links.
+                      </p>
+                    </div>
+                  </div>
+                  <Link to="/pricing" className={cn(buttonVariants(), "shrink-0")}>
+                    Explore Pro <ArrowUpRight className="size-4" />
+                  </Link>
+                </CardContent>
+              </Card>
+            )}
 
             <section aria-label="More engagement" className="grid gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(280px,1fr)]">
               <Card className="border-border/70 shadow-sm">
