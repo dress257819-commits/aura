@@ -87,14 +87,15 @@ FastAPI, async throughout. `python` is the app venv interpreter
   Pro, and Creator entitlements and configured checkout providers resume.
   Stripe, eSewa, and Khalti still require their merchant credentials.
 - **Deploy the complete website**:
-  1. Create a MongoDB Atlas cluster and database user. Copy the application
+  1. Use an existing MongoDB Atlas cluster or create one if needed. Create or
+     reuse a database user with access to the application database. Copy the
      connection string as the private `MONGO_URL` value. In Atlas Network Access,
-     allow the Render service's outbound IPs; if using a temporary broad IP rule,
-     replace it with the listed Render IPs after deployment.
+     allow the Render service's outbound IP ranges after the service is created.
   2. Sign in at Render, choose **New → Blueprint**, and connect
      `dress257819-commits/aura`. Render reads `render.yaml`, builds the root
-     `Dockerfile`, and serves the frontend and FastAPI API on one HTTPS origin.
-     Enter the Atlas connection string for `MONGO_URL` and deploy.
+     `Dockerfile`, and serves the frontend and FastAPI API on one HTTPS origin
+     using the free web-service plan. Enter the Atlas connection string for
+     `MONGO_URL` and deploy.
   3. Open the Render service URL and check `/api/health`. Create an account and
      try profile editing, uploads, links, messages, and the dashboard.
   4. Optional integrations need secrets added in the Render dashboard, never
@@ -103,9 +104,10 @@ FastAPI, async throughout. `python` is the app venv interpreter
      plus `/auth`, set `FRONTEND_URL` and `BACKEND_PUBLIC_URL` to the service URL,
      and add `EMERGENT_LLM_KEY` for AI replies. Add Stripe/eSewa/Khalti merchant
      credentials to enable those payment methods after the free offer ends.
-  Render's Starter web service and persistent media disk are paid resources;
-  review current pricing before creating them. The disk preserves uploaded
-  profile images across deploys; a free/ephemeral service does not.
+  Render's free web service can sleep after 15 minutes without traffic, so its
+  first request afterward may take about a minute. Its filesystem is temporary:
+  uploaded media can be lost when the service sleeps, restarts, or redeploys.
+  Upgrade to a paid service with a persistent disk if uploads must be retained.
 - **Dates**: `backend/lib/dates.py` — `today_iso(tz=None)`. The pod clock is
   UTC; anchor "today" server-side with this, never with client-side date math.
 - **Interactive check**: `cd /app/backend && python -c 'import server'` catches

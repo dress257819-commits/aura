@@ -2,21 +2,15 @@ services:
   - type: web
     name: aura
     runtime: docker
-    plan: starter
+    plan: free
     dockerfilePath: ./Dockerfile
     dockerContext: .
     healthCheckPath: /api/health
-    disk:
-      name: aura-media
-      mountPath: /var/data/aura/uploads
-      sizeGB: 1
     envVars:
       - key: MONGO_URL
         sync: false
       - key: DB_NAME
         value: aura
-      - key: AURA_UPLOAD_DIR
-        value: /var/data/aura/uploads
       - key: AURA_FREE_ACCESS_END
         value: "2026-12-01T16:36:13.739Z"
       - key: COOKIE_SECURE
