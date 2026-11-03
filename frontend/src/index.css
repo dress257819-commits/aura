@@ -321,8 +321,8 @@
 }
 
 .premium-nav-cta {
-  min-height: 2.35rem;
-  padding-inline: 1rem;
+  min-height: 2.2rem;
+  padding-inline: 0.75rem;
   font-size: 0.8rem;
 }
 
@@ -363,6 +363,11 @@
   .premium-title {
     font-size: clamp(3rem, 12vw, 4.5rem);
     letter-spacing: -0.075em;
+  }
+
+  .premium-link,
+  .premium-link-ghost {
+    min-height: 2.75rem;
   }
 }
 
@@ -512,8 +517,8 @@
   box-shadow: 0 8px 24px rgb(47 36 58 / 22%);
 }
 
-.creator-hub-light .hub-primary-button,
-.creator-hub-light .hub-primary-button [class*="text-white"] {
+.creator-hub-light .creator-hub-action-primary,
+.creator-hub-light .creator-hub-action-primary [class*="text-white"] {
   color: #fff !important;
 }
 

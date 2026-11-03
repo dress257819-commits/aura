@@ -24,6 +24,7 @@ const EMPTY_USER: MeProfile = {
     effects: true,
     custom_css: "",
   },
+  explore_visible: true,
   leaderboard_visible: false,
   plan: "pro",
   created_at: new Date().toISOString(),

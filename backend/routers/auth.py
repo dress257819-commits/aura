@@ -97,6 +97,7 @@ def me_response(user: User) -> MeProfile:
         cover_url=user.cover_url, interests=user.interests,
         daily_question=user.daily_question, music=user.music,
         appearance=user.appearance, chatbot=user.chatbot,
+        explore_visible=user.explore_visible,
         plan=effective_plan(user.model_dump()),
         leaderboard_visible=user.leaderboard_visible, created_at=user.created_at,
     )

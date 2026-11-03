@@ -1,6 +1,6 @@
 // The public profile renderer — used full-page on /u/:username and inside the
 // dashboard's live phone simulator. Renders from the theme the owner picked.
-import { useMemo, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -15,6 +15,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogTitle,
 } from "@/components/ui/dialog";
 import { ShareModal } from "@/components/profile/ShareModal";
+import { ProfileAvatar } from "@/components/shared/ProfileAvatar";
 import { apiPost, ApiError } from "@/lib/api";
 import { getLocalMe } from "@/lib/auth";
 import { isLocallyFollowing, setLocalFollowing } from "@/lib/follows";
@@ -66,6 +67,49 @@ function ProfileBanner({
         />
       )}
     </section>
+  );
+}
+
+function ProfileShareControl({
+  username,
+  accent,
+  onOpen,
+}: {
+  username: string;
+  accent: string;
+  onOpen: () => void;
+}) {
+  const url = `${window.location.origin}/u/${username}`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="fixed bottom-5 right-5 z-40 hidden flex-col items-center gap-2 rounded-2xl border border-[#342d3b]/10 bg-white/90 p-3 text-[#342d3b] shadow-lg backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:shadow-xl lg:flex"
+        aria-label={`Open sharing options for @${username}`}
+        data-testid="profile-share-qr-control"
+      >
+        <img
+          src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(url)}`}
+          alt={`QR code for @${username}'s profile`}
+          width={112}
+          height={112}
+          className="size-28 rounded-lg bg-white"
+        />
+        <span className="text-xs font-semibold">Scan to open profile</span>
+      </button>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="fixed bottom-5 right-5 z-40 grid size-12 place-items-center rounded-full text-white opacity-80 shadow-lg transition hover:-translate-y-0.5 hover:opacity-100 hover:shadow-xl lg:hidden"
+        style={{ background: `linear-gradient(110deg, ${accent}, #C056E8)` }}
+        aria-label={`Share @${username}'s profile`}
+        data-testid="profile-share-mobile-control"
+      >
+        <Share2 className="size-5" />
+      </button>
+    </>
   );
 }
 
@@ -153,10 +197,15 @@ export function GalleryImageViewer() {
 
 export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: ProfileCanvasProps) {
   const { profile, links, gallery, poll, qa, followers, following } = bundle;
-  const { data: me } = useMe();
+  const { data: me, isLoading: isMeLoading } = useMe();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const localMe = getLocalMe();
+  const isOwner = !preview && (
+    me?.username.toLowerCase() === profile.username.toLowerCase()
+    || localMe?.username.toLowerCase() === profile.username.toLowerCase()
+  );
+  const homePath = me || localMe ? "/dashboard" : "/";
 
   const appearance = appearanceOverride ?? profile.appearance;
   const theme = useMemo(() => themeOf(appearance), [appearance]);
@@ -169,7 +218,18 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
   const [msgName, setMsgName] = useState("");
   const [votedOption, setVotedOption] = useState<string | null>(null);
   const [hubLightMode, setHubLightMode] = useState(true);
+  const messageFormRef = useRef<HTMLElement | null>(null);
   const isFollowing = following || Boolean(localMe && isLocallyFollowing(localMe.id, profile.username));
+
+  useEffect(() => {
+    if (msgOpen && !preview) {
+      messageFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [msgOpen, preview]);
+
+  const openMessageForm = () => {
+    if (!preview) setMsgOpen(true);
+  };
 
   const socialLinks = links.filter((l) => platformDef(l.platform).social);
   const cardLinks = links.filter((l) => !platformDef(l.platform).social || l.description || l.thumbnail_url);
@@ -177,6 +237,11 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
   const trackViewShare = (type: "share") => {
     if (preview) return;
     void apiPost(`/u/${profile.username}/events`, { type, ref: "" }).catch(() => undefined);
+  };
+
+  const openShare = () => {
+    setShareOpen(true);
+    trackViewShare("share");
   };
 
   const clickLink = (linkId: string, url: string) => {
@@ -319,13 +384,15 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
         )}
 
         <header className="relative mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link to="/" className="inline-flex items-center gap-2.5" aria-label="AURA home">
+          <Link to={homePath} className="inline-flex items-center gap-2.5" aria-label="AURA home">
             <span className="grid size-8 place-items-center rounded-full bg-[#1f1f1f] text-sm font-bold text-white">A</span>
             <span className="font-heading text-sm font-bold tracking-tight">AURA</span>
           </Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.22em]" style={{ color: theme.muted }}>
-            Creator profile
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[10px] uppercase tracking-[0.22em]" style={{ color: theme.muted }}>
+              Creator profile
+            </span>
+          </div>
         </header>
 
         <main className={cn("aura-profile relative mx-auto max-w-5xl px-3 pb-12 sm:px-6", preview ? "pt-1" : "pt-5 sm:pt-8")}>
@@ -362,23 +429,16 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               <div className="absolute -right-7 -top-20 size-56 rounded-full border border-white/10" aria-hidden />
               <div className="absolute right-8 top-5 size-36 rounded-full border border-white/10" aria-hidden />
               <div className="absolute bottom-3 left-5 flex items-end gap-3 sm:bottom-4 sm:left-7 sm:gap-4">
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.name}
-                    className="size-[4.25rem] rounded-2xl border-4 object-cover shadow-xl sm:size-[4.5rem]"
-                    style={{ borderColor: theme.card }}
-                    data-testid="profile-avatar"
-                  />
-                ) : (
-                  <span
-                    className="grid size-[4.25rem] place-items-center rounded-2xl border-4 text-2xl font-bold text-white shadow-xl sm:size-[4.5rem]"
-                    style={{ borderColor: theme.card, background: `linear-gradient(135deg, ${accent}, ${accent}99)` }}
-                    data-testid="profile-avatar"
-                  >
-                    {profile.name.charAt(0).toUpperCase()}
-                  </span>
-                )}
+                <ProfileAvatar
+                  src={profile.avatar_url}
+                  name={profile.name}
+                  className={cn(
+                    "size-[4.25rem] rounded-2xl border-4 shadow-xl sm:size-[4.5rem]",
+                    profile.avatar_url ? "object-cover" : "object-contain",
+                  )}
+                  style={{ borderColor: theme.card }}
+                  data-testid="profile-avatar"
+                />
                 <div className="pb-1 text-white">
                   <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-white/65">AURA creator</p>
                   <p className="mt-1 inline-flex items-center gap-1 text-xs font-medium">
@@ -433,20 +493,31 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               </div>
 
               <div className="flex flex-wrap items-center gap-2" data-testid="profile-actions-row">
-                <Button
-                  size="sm"
-                  className="rounded-full px-4 text-white"
-                  style={{ background: accent, boxShadow: `0 7px 20px ${accent}30` }}
-                  onClick={() => setMsgOpen((open) => !open)}
-                  data-testid="anonymous-message-open-button"
-                >
-                  <MessageCircle className="size-4" /> Say hello
-                </Button>
-                {!(me?.username === profile.username) && !preview && (
+                {isOwner ? (
                   <Button
-                    size="sm"
+                    render={<Link to="/dashboard" />}
+                    size="default"
+                    className="creator-hub-action-primary min-h-10 rounded-full px-5 text-sm"
+                    data-testid="profile-edit-button"
+                  >
+                    Edit profile
+                  </Button>
+                ) : !isMeLoading && (
+                  <Button
+                    size="default"
+                    className="creator-hub-action-primary min-h-10 rounded-full px-5 text-sm text-white"
+                    style={{ background: accent, boxShadow: `0 7px 20px ${accent}30` }}
+                    onClick={openMessageForm}
+                    data-testid="anonymous-message-open-button"
+                  >
+                    <MessageCircle className="size-4" /> Send a message
+                  </Button>
+                )}
+                {!isOwner && !preview && (
+                  <Button
+                    size="default"
                     variant="ghost"
-                    className="rounded-full border"
+                    className="min-h-10 rounded-full border px-4"
                     style={{ borderColor: theme.cardBorder, color: theme.text }}
                     onClick={() => toggleFollow.mutate()}
                     disabled={toggleFollow.isPending}
@@ -456,23 +527,10 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                     {isFollowing ? "Following" : "Follow"}
                   </Button>
                 )}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="rounded-full border"
-                  style={{ borderColor: theme.cardBorder, color: theme.text }}
-                  onClick={() => {
-                    setShareOpen(true);
-                    trackViewShare("share");
-                  }}
-                  data-testid="profile-share-button"
-                >
-                  <Share2 className="size-4" /> Share
-                </Button>
               </div>
 
-              {msgOpen && (
-                <section className="rounded-2xl border p-4" style={cardStyle} data-testid="message-form">
+              {msgOpen && !isOwner && (
+                <section ref={messageFormRef} className="rounded-2xl border p-4 scroll-mt-24" style={cardStyle} data-testid="message-form">
                   {profile.daily_question && (
                     <p className="mb-3 flex items-start gap-2 text-sm font-medium" data-testid="daily-question">
                       <CalendarHeart className="mt-0.5 size-4 shrink-0" style={{ color: accent }} />
@@ -498,10 +556,10 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                   <div className="mt-3 flex items-center justify-between">
                     <span className="text-xs" style={{ color: theme.muted }}>{msgText.length}/500</span>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="ghost" onClick={() => setMsgOpen(false)} data-testid="message-cancel-button">Cancel</Button>
+                      <Button size="default" variant="ghost" className="min-h-10 rounded-full px-4" onClick={() => setMsgOpen(false)} data-testid="message-cancel-button">Cancel</Button>
                       <Button
-                        size="sm"
-                        className="text-white"
+                        size="default"
+                        className="creator-hub-action-primary min-h-10 rounded-full px-4 text-white"
                         style={{ background: accent }}
                         disabled={sendMessage.isPending || msgText.trim().length < 2}
                         onClick={() => sendMessage.mutate()}
@@ -666,6 +724,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
           </footer>
         </main>
 
+        {!preview && <ProfileShareControl username={profile.username} accent={accent} onOpen={openShare} />}
         <ShareModal open={shareOpen} onOpenChange={setShareOpen} username={profile.username} name={profile.name} />
       </div>
     );
@@ -715,7 +774,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
           {appearance.custom_css && <style>{appearance.custom_css}</style>}
           <header className={cn("flex items-center justify-between", !preview && "lg:col-span-12")}>
             <Link
-              to="/"
+              to={homePath}
               className={cn("inline-flex items-center gap-2.5 text-sm font-bold tracking-wide", hubLightMode ? "text-[#201b27]" : "text-white")}
               aria-label="AURA home"
               data-testid="profile-home-link"
@@ -727,6 +786,33 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               <span>AURA <span className="ml-1 font-mono text-[10px] font-medium tracking-[0.18em] text-white/45">STUDIO</span></span>
             </Link>
             <div className="flex items-center gap-2">
+              {isOwner ? (
+                <Button
+                  render={<Link to="/dashboard" />}
+                  size="default"
+                  className={cn(
+                    "creator-hub-action-primary min-h-10 rounded-full px-4 text-sm",
+                    hubLightMode ? "bg-[#201b27] text-white hover:bg-[#342d3b]" : "bg-white text-[#201b27] hover:bg-white/90",
+                  )}
+                  data-testid="profile-edit-button"
+                >
+                  Edit profile
+                </Button>
+              ) : !isMeLoading && (
+                <Button
+                  size="default"
+                  className={cn("creator-hub-action-primary min-h-10 rounded-full px-4 text-sm text-white", preview && "size-9 min-h-9 p-0")}
+                  style={{ background: `linear-gradient(110deg, ${accent}, #C056E8)` }}
+                  onClick={openMessageForm}
+                  aria-label="Send a message"
+                  title="Send a message"
+                  data-testid="anonymous-message-open-button"
+                >
+                  <MessageCircle className="size-4" />
+                  <span className="hidden sm:inline">Send a message</span>
+                  {!preview && <span className="sm:hidden">Message</span>}
+                </Button>
+              )}
               <button
                 type="button"
                 onClick={() => setHubLightMode((light) => !light)}
@@ -742,31 +828,6 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               >
                 {hubLightMode ? <Moon className="size-4" /> : <Sun className="size-4" />}
               </button>
-              {!preview && socialLinks.length > 0 && (
-                <a
-                  href={preview ? undefined : socialLinks[0].url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(event) => {
-                    if (preview) event.preventDefault();
-                    else void apiPost(`/u/${profile.username}/links/${socialLinks[0].id}/click`, {}).catch(() => undefined);
-                  }}
-                  className="hidden items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-white/80 transition hover:border-white/35 sm:inline-flex"
-                >
-                  Let’s connect <ExternalLink className="size-3.5" />
-                </a>
-              )}
-              <Button
-                size="sm"
-                className={cn("hub-primary-button rounded-full text-white", preview ? "size-9 p-0" : "px-4")}
-                style={{ background: `linear-gradient(110deg, ${accent}, #C056E8)` }}
-                onClick={() => setMsgOpen(true)}
-                aria-label="Say hello"
-                title="Say hello"
-              >
-                <MessageCircle className="size-4" />
-                {!preview && "Say hello"}
-              </Button>
             </div>
           </header>
 
@@ -829,18 +890,18 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
 
                 <div className={cn("flex flex-wrap justify-center sm:justify-start", preview ? "mt-4 gap-2" : "mt-6 gap-2.5")}>
                   <Button
-                    size="sm"
-                    className="rounded-full px-5 text-white shadow-lg"
+                    size="default"
+                    className="creator-hub-action-primary min-h-10 rounded-full px-5 text-white shadow-lg"
                     style={{ background: `linear-gradient(110deg, ${accent}, #C056E8)`, boxShadow: `0 8px 28px ${accent}55` }}
                     onClick={() => document.getElementById("creator-hub-links")?.scrollIntoView({ behavior: "smooth" })}
                   >
                     <ExternalLink className="size-4" /> Explore links
                   </Button>
-                  {!preview && !(me?.username === profile.username) && (
+                  {!isOwner && !preview && (
                     <Button
-                      size="sm"
+                      size="default"
                       variant="ghost"
-                      className="rounded-full border border-white/15 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white"
+                      className="min-h-10 rounded-full border border-white/15 bg-white/[0.04] px-4 text-white hover:bg-white/10 hover:text-white"
                       onClick={() => toggleFollow.mutate()}
                       disabled={toggleFollow.isPending}
                       data-testid="follow-button"
@@ -849,18 +910,6 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                       {isFollowing ? "Following" : "Follow"}
                     </Button>
                   )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="rounded-full border border-white/15 bg-white/[0.04] text-white hover:bg-white/10 hover:text-white"
-                    onClick={() => {
-                      setShareOpen(true);
-                      trackViewShare("share");
-                    }}
-                    data-testid="profile-share-button"
-                  >
-                    <Share2 className="size-4" /> Share
-                  </Button>
                 </div>
               </div>
 
@@ -873,19 +922,13 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                 >
                   <div className="creator-hub-orbit-ring creator-hub-orbit-ring-wide absolute inset-x-[-18%] top-1/2 h-28 -translate-y-1/2 rotate-[-14deg] rounded-[50%] border border-violet-200/25" />
                   <div className="creator-hub-orbit-ring absolute inset-x-[-12%] top-1/2 h-40 -translate-y-1/2 rotate-[12deg] rounded-[50%] border border-dashed border-white/10" />
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt={profile.name}
-                      className="absolute inset-y-0 left-1/2 h-full w-[86%] object-contain grayscale [mask-image:linear-gradient(to_bottom,#000_68%,rgba(0,0,0,0.82)_82%,transparent_100%)] drop-shadow-[0_20px_28px_rgba(27,20,40,0.22)]"
-                      style={{ transform: "translateX(-50%) translateZ(0)" }}
-                      data-testid="profile-avatar"
-                    />
-                  ) : (
-                    <div className="relative grid h-full w-[70%] place-items-center text-8xl font-extrabold text-white/90" style={{ transform: "translateZ(0)" }} data-testid="profile-avatar" aria-hidden="true">
-                      {profile.name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
+                  <ProfileAvatar
+                    src={profile.avatar_url}
+                    name={profile.name}
+                    className="absolute inset-y-0 left-1/2 h-full w-[86%] object-contain grayscale [mask-image:linear-gradient(to_bottom,#000_68%,rgba(0,0,0,0.82)_82%,transparent_100%)] drop-shadow-[0_20px_28px_rgba(27,20,40,0.22)]"
+                    style={{ transform: "translateX(-50%) translateZ(0)" }}
+                    data-testid="profile-avatar"
+                  />
                   {socialLinks.slice(0, 8).map((link, index) => {
                     const def = platformDef(link.platform);
                     const Icon = def.icon;
@@ -1053,7 +1096,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
             )}
           </section>
 
-          <section className={cn("rounded-[1.75rem] border p-4 backdrop-blur-xl sm:p-6", !preview && "lg:col-span-3")} style={hubPanelStyle} data-testid="anonymous-message-box">
+          {!isOwner && <section ref={messageFormRef} className={cn("scroll-mt-24 rounded-[1.75rem] border p-4 backdrop-blur-xl sm:p-6", !preview && "lg:col-span-3")} style={hubPanelStyle} data-testid="anonymous-message-box">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="flex items-center gap-2 font-heading text-lg font-bold"><MessageCircle className="size-4 text-violet-300" /> Anonymous ask</h2>
@@ -1084,10 +1127,10 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-white/40">{msgText.length}/500</span>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="ghost" className="text-white/65 hover:bg-white/10 hover:text-white" onClick={() => setMsgOpen(false)} data-testid="message-cancel-button">Cancel</Button>
+                    <Button size="default" variant="ghost" className="min-h-10 rounded-full px-4 text-white/65 hover:bg-white/10 hover:text-white" onClick={() => setMsgOpen(false)} data-testid="message-cancel-button">Cancel</Button>
                     <Button
-                      size="sm"
-                      className="text-white"
+                      size="default"
+                      className="creator-hub-action-primary min-h-10 rounded-full px-4 text-white"
                       style={{ background: accent }}
                       disabled={sendMessage.isPending || msgText.trim().length < 2}
                       onClick={() => sendMessage.mutate()}
@@ -1101,14 +1144,14 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
             ) : (
               <button
                 type="button"
-                onClick={() => setMsgOpen(true)}
+                onClick={openMessageForm}
                 className="mt-5 flex w-full items-center justify-between rounded-full border border-white/10 bg-black/25 px-4 py-3 text-left text-sm text-white/40 transition-colors hover:border-violet-300/35 hover:text-white/70"
               >
                 Type your question…
                 <span className="grid size-8 place-items-center rounded-full text-white" style={{ background: accent }}><MessageCircle className="size-4" /></span>
               </button>
             )}
-          </section>
+          </section>}
 
           {poll && (
             <section className={cn("rounded-[1.75rem] border p-4 backdrop-blur-xl sm:p-6", !preview && "lg:col-span-4")} style={hubPanelStyle} data-testid="poll-widget">
@@ -1204,6 +1247,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
           </footer>
         </main>
 
+        {!preview && <ProfileShareControl username={profile.username} accent={accent} onOpen={openShare} />}
         <ShareModal open={shareOpen} onOpenChange={setShareOpen} username={profile.username} name={profile.name} />
       </div>
     );
@@ -1258,22 +1302,16 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
       >
         {/* identity block */}
         <div className="-mt-14 flex flex-col items-center text-center">
-          {profile.avatar_url ? (
-            <img
-              src={profile.avatar_url}
-              alt={profile.name}
-              className="size-24 rounded-full object-cover ring-4 shadow-xl"
-              style={{ borderColor: accent, boxShadow: `0 8px 30px ${accent}55` }}
-              data-testid="profile-avatar"
-            />
-          ) : (
-            <div
-              className="grid size-24 place-items-center rounded-full text-3xl font-bold ring-4"
-              style={{ background: `${accent}33`, color: theme.text, borderColor: accent }}
-            >
-              {profile.name.charAt(0)}
-            </div>
-          )}
+          <ProfileAvatar
+            src={profile.avatar_url}
+            name={profile.name}
+            className={cn(
+              "size-24 rounded-full ring-4 shadow-xl",
+              profile.avatar_url ? "object-cover" : "object-contain",
+            )}
+            style={{ borderColor: accent, boxShadow: `0 8px 30px ${accent}55` }}
+            data-testid="profile-avatar"
+          />
           <h1
             className="mt-3 break-words text-2xl font-bold tracking-tight"
             data-testid="profile-name"
@@ -1321,22 +1359,31 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
 
         {/* actions */}
         <div className="flex items-center justify-center gap-2" data-testid="profile-actions-row">
-          <Button
-            size="sm"
-            className="rounded-full text-white shadow-lg"
-            style={{ background: accent, boxShadow: `0 8px 24px ${accent}44` }}
-            onClick={() => {
-              setMsgOpen((v) => !v);
-            }}
-            data-testid="anonymous-message-open-button"
-          >
-            <MessageCircle className="size-4" /> Send a message
-          </Button>
-          {!(me?.username === profile.username) && !preview && (
+          {isOwner ? (
             <Button
-              size="sm"
+              render={<Link to="/dashboard" />}
+              size="default"
+              className="min-h-10 rounded-full px-5 text-sm"
+              data-testid="profile-edit-button"
+            >
+              Edit profile
+            </Button>
+          ) : !isMeLoading && (
+            <Button
+              size="default"
+              className="min-h-10 rounded-full px-5 text-sm text-white shadow-lg"
+              style={{ background: accent, boxShadow: `0 8px 24px ${accent}44` }}
+              onClick={openMessageForm}
+              data-testid="anonymous-message-open-button"
+            >
+              <MessageCircle className="size-4" /> Send a message
+            </Button>
+          )}
+          {!isOwner && !preview && (
+            <Button
+              size="default"
               variant="ghost"
-              className="rounded-full"
+              className="min-h-10 rounded-full px-4"
               style={{ border: `1px solid ${theme.cardBorder}`, color: theme.text }}
               onClick={() => toggleFollow.mutate()}
               disabled={toggleFollow.isPending}
@@ -1346,19 +1393,6 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               {isFollowing ? "Following" : "Follow"}
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="ghost"
-            className="rounded-full"
-            style={{ border: `1px solid ${theme.cardBorder}`, color: theme.text }}
-            onClick={() => {
-              setShareOpen(true);
-              trackViewShare("share");
-            }}
-            data-testid="profile-share-button"
-          >
-            <Share2 className="size-4" /> Share
-          </Button>
         </div>
 
         {/* social icon row */}
@@ -1516,7 +1550,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
         )}
 
         {/* daily question + anonymous message box */}
-        <section className="rounded-2xl border p-4" style={cardStyle} data-testid="anonymous-message-box">
+        {!isOwner && <section ref={messageFormRef} className="scroll-mt-24 rounded-2xl border p-4" style={cardStyle} data-testid="anonymous-message-box">
           <h2 className="label-caps mb-2" style={{ color: theme.muted }}>
             Ask anything
           </h2>
@@ -1575,7 +1609,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
               Drop a question, a compliment or a dare — {profile.name} sees it privately first.
             </p>
           )}
-        </section>
+        </section>}
 
         {/* live poll */}
         {poll && (
@@ -1652,9 +1686,14 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
                   </span>
                 </p>
                 <div className="mt-3 flex gap-2.5">
-                  {profile.avatar_url && (
-                    <img src={profile.avatar_url} alt="" className="size-7 shrink-0 rounded-full object-cover" />
-                  )}
+                  <ProfileAvatar
+                    src={profile.avatar_url}
+                    name={profile.name}
+                    className={cn(
+                      "size-7 shrink-0 rounded-full",
+                      profile.avatar_url ? "object-cover" : "object-contain",
+                    )}
+                  />
                   <p
                     className="rounded-2xl rounded-tl-md px-3 py-2 text-sm leading-relaxed"
                     style={{ background: `${accent}18` }}
@@ -1682,6 +1721,7 @@ export function ProfileCanvas({ bundle, appearanceOverride, preview = false }: P
         </footer>
       </div>
 
+      {!preview && <ProfileShareControl username={profile.username} accent={accent} onOpen={openShare} />}
       <ShareModal
         open={shareOpen}
         onOpenChange={setShareOpen}

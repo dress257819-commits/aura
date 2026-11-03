@@ -60,6 +60,7 @@ class User(BaseModel):
     music: List[MusicTrack] = Field(default_factory=list)
     appearance: Appearance = Field(default_factory=Appearance)
     chatbot: ChatbotSettings = Field(default_factory=ChatbotSettings)
+    explore_visible: bool = True
     leaderboard_visible: bool = False
     plan: Literal["free", "pro", "creator"] = "free"
     plan_expires_at: Optional[datetime] = None
@@ -106,6 +107,7 @@ class MeProfile(BaseModel):
     music: List[MusicTrack] = Field(default_factory=list)
     appearance: Appearance = Field(default_factory=Appearance)
     chatbot: ChatbotSettings = Field(default_factory=ChatbotSettings)
+    explore_visible: bool = True
     leaderboard_visible: bool = False
     plan: str = "free"
     created_at: datetime

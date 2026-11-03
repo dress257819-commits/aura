@@ -78,6 +78,7 @@ class ProfileUpdate(BaseModel):
     interests: list[str] | None = None
     daily_question: str | None = None
     music: list[MusicTrack] | None = None
+    explore_visible: bool | None = None
     leaderboard_visible: bool | None = None
 
 
@@ -236,6 +237,8 @@ async def update_profile(input: ProfileUpdate, user: User = Depends(get_current_
         updates["interests"] = [i.strip()[:24] for i in input.interests[:8] if i.strip()]
     if input.music is not None:
         updates["music"] = [m.model_dump() for m in input.music[:5]]
+    if input.explore_visible is not None:
+        updates["explore_visible"] = input.explore_visible
     if input.leaderboard_visible is not None:
         updates["leaderboard_visible"] = input.leaderboard_visible
 

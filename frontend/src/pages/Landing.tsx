@@ -1,10 +1,11 @@
 import { Link } from "react-router-dom";
 import {
-  ArrowRight, Inbox, Link2, MessageCircle, MessagesSquare, Palette, UserRound, Wand2,
+  ArrowRight, BarChart3, Inbox, Link2, MessageCircle, MessagesSquare, Palette, UserRound, Wand2,
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
+import { ProfileAvatar } from "@/components/shared/ProfileAvatar";
 import { DEMO_PROFILE_BUNDLE } from "@/lib/demo";
 import { cn } from "@/lib/utils";
 
@@ -51,6 +52,12 @@ const FEATURES = [
     body: "Ask a question or run a poll to start conversations with visitors.",
     testid: "feature-polls",
   },
+  {
+    icon: BarChart3,
+    title: "Insights that help you grow",
+    body: "See how people find and interact with your profile, links, and content.",
+    testid: "feature-analytics",
+  },
 ];
 
 const THEME_SWATCHES = [
@@ -81,17 +88,19 @@ export default function Landing() {
             <p className="premium-copy mt-7">
               Add your social links and work to one page. Let visitors message you, ask questions, and join polls. Share one link to your profile.
             </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
+            <div className="mt-8 flex w-full flex-nowrap items-center gap-2 sm:w-auto sm:gap-3">
               <Link
                 to="/auth"
-                className={cn(buttonVariants({ size: "lg" }), "premium-link")}
+                className={cn(buttonVariants({ size: "lg" }), "premium-link min-w-0 flex-1 whitespace-nowrap px-2 text-[0.7rem] sm:flex-none sm:px-5 sm:text-sm")}
                 data-testid="hero-cta-button"
               >
-                Create your profile <ArrowRight className="size-4" />
+                <span className="sm:hidden">Create profile</span>
+                <span className="hidden sm:inline">Create your profile</span>
+                <ArrowRight className="size-3.5 shrink-0 sm:size-4" />
               </Link>
               <Link
                 to="/explore"
-                className={cn(buttonVariants({ variant: "outline", size: "lg" }), "premium-link-ghost")}
+                className={cn(buttonVariants({ variant: "outline", size: "lg" }), "premium-link-ghost min-w-0 flex-1 whitespace-nowrap px-2 text-[0.7rem] sm:flex-none sm:px-5 sm:text-sm")}
                 data-testid="hero-demo-link"
               >
                 See creator profiles
@@ -123,17 +132,11 @@ export default function Landing() {
                 <div className="absolute -right-10 -top-20 size-56 rounded-full border border-white/10" aria-hidden />
                 <div className="absolute -right-1 top-2 size-36 rounded-full border border-white/10" aria-hidden />
                 <div className="absolute bottom-4 left-6 flex items-end gap-4 sm:left-8">
-                  {profile.avatar_url ? (
-                    <img
-                      src={profile.avatar_url}
-                      alt=""
-                      className="size-[4.5rem] rounded-2xl border-4 border-card object-cover shadow-xl"
-                    />
-                  ) : (
-                    <span className="premium-profile-avatar grid size-[4.5rem] place-items-center rounded-2xl border-4 border-card font-heading text-2xl font-bold text-white shadow-xl">
-                      {profile.name.charAt(0)}
-                    </span>
-                  )}
+                  <ProfileAvatar
+                    src={profile.avatar_url}
+                    name={profile.name}
+                    className={`size-[4.5rem] rounded-2xl border-4 border-card shadow-xl ${profile.avatar_url ? "object-cover" : "object-contain"}`}
+                  />
                   <div className="pb-1">
                     <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/65">AURA creator</p>
                     <p className="mt-1 text-xs font-medium text-white">@{profile.username}</p>

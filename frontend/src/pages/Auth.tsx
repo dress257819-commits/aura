@@ -12,11 +12,14 @@ import { authenticateLocalUser, createLocalUser, persistLocalSession } from "@/l
 import { beginSession } from "@/lib/session";
 import type { MeProfile } from "@/lib/types";
 import { ThemeToggle } from "@/components/shared/ThemeToggle";
+import { ProfileAvatar } from "@/components/shared/ProfileAvatar";
 import { DEMO_PROFILE_BUNDLE } from "@/lib/demo";
+import { useMe } from "@/lib/hooks";
 
 export default function Auth() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { data: me, isLoading: isMeLoading } = useMe();
   const { profile, links } = DEMO_PROFILE_BUNDLE;
   const [activeTab, setActiveTab] = useState("signin");
   const [loginEmail, setLoginEmail] = useState("");
@@ -25,6 +28,10 @@ export default function Auth() {
   const [signupPassword, setSignupPassword] = useState("");
   const [signupName, setSignupName] = useState("");
   const [signupUsername, setSignupUsername] = useState("");
+
+  useEffect(() => {
+    if (!isMeLoading && me) navigate("/dashboard", { replace: true });
+  }, [isMeLoading, me, navigate]);
 
   useEffect(() => {
     const googleStatus = new URLSearchParams(location.search).get("google");
@@ -141,9 +148,11 @@ export default function Auth() {
               <div className="absolute -right-8 -top-16 size-44 rounded-full border border-white/10" aria-hidden />
               <div className="absolute -right-1 top-2 size-28 rounded-full border border-white/10" aria-hidden />
               <div className="absolute bottom-3 left-5 flex items-end gap-3">
-                <span className="premium-profile-avatar grid size-14 place-items-center rounded-xl border-[3px] border-[#191e28] font-heading text-xl font-bold text-white shadow-lg">
-                  {profile.name.charAt(0)}
-                </span>
+                <ProfileAvatar
+                  src={profile.avatar_url}
+                  name={profile.name}
+                  className={`size-14 rounded-xl border-[3px] border-[#191e28] shadow-lg ${profile.avatar_url ? "object-cover" : "object-contain"}`}
+                />
                 <div className="pb-1">
                   <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-white/65">AURA creator</p>
                   <p className="mt-0.5 text-[11px] font-medium text-white">@{profile.username}</p>

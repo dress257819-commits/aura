@@ -7,7 +7,7 @@ from datetime import timedelta
 
 from lib.db import db
 from lib.session import get_current_user
-from models.models import Message, MessageCreate, MessageUpdate, User, utcnow
+from models.models import Message, MessageCounts, MessageCreate, MessageUpdate, User, utcnow
 
 router = APIRouter()
 
@@ -67,6 +67,14 @@ async def inbox(status: str | None = None, user: User = Depends(get_current_user
         query["status"] = status
     docs = await db.messages.find(query).sort("created_at", -1).to_list(300)
     return [Message(**d) for d in docs]
+
+
+@router.get("/me/messages/count", response_model=MessageCounts)
+async def inbox_count(user: User = Depends(get_current_user)):
+    recipient_filter = {"recipient_id": user.id}
+    pending = await db.messages.count_documents({**recipient_filter, "status": "pending"})
+    total = await db.messages.count_documents(recipient_filter)
+    return MessageCounts(pending=pending, total=total)
 
 
 @router.patch("/me/messages/{message_id}", response_model=Message)

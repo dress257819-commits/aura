@@ -21,7 +21,7 @@ async def explore(
     tag: str = "",
     viewer: User | None = Depends(get_optional_user),
 ):
-    query: dict = {}
+    query: dict = {"explore_visible": {"$ne": False}}
     if q.strip():
         needle = re.escape(q.strip().lower())
         query["$or"] = [

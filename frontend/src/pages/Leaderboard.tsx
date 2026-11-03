@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Crown, Eye, MousePointerClick, Trophy, Users, Vote } from "lucide-react";
 import { Navbar } from "@/components/shared/Navbar";
 import { Footer } from "@/components/shared/Footer";
+import { ProfileAvatar } from "@/components/shared/ProfileAvatar";
 import { apiGet } from "@/lib/api";
 import type { LeaderboardResponse } from "@/lib/types";
 
@@ -102,13 +103,11 @@ export default function Leaderboard() {
                       <span className="font-mono text-xs text-muted-foreground">#{entry.rank}</span>
                     </div>
                     <div className="mt-5 flex items-center gap-3">
-                      {entry.avatar_url ? (
-                        <img src={entry.avatar_url} alt="" className="size-11 rounded-full object-cover" />
-                      ) : (
-                        <span className="grid size-11 place-items-center rounded-full bg-muted font-semibold">
-                          {entry.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <ProfileAvatar
+                        src={entry.avatar_url}
+                        name={entry.name}
+                        className={`size-11 rounded-full ${entry.avatar_url ? "object-cover" : "object-contain"}`}
+                      />
                       <span className="min-w-0">
                         <span className="block truncate font-semibold">{entry.name}</span>
                         <span className="block truncate font-mono text-xs text-muted-foreground">@{entry.username}</span>
@@ -145,13 +144,11 @@ export default function Leaderboard() {
                 >
                   <span className="font-mono text-sm text-muted-foreground">#{entry.rank}</span>
                   <Link to={`/u/${entry.username}`} className="flex min-w-0 items-center gap-3 hover:underline">
-                    {entry.avatar_url ? (
-                      <img src={entry.avatar_url} alt="" className="size-9 rounded-full object-cover" />
-                    ) : (
-                      <span className="grid size-9 place-items-center rounded-full bg-muted text-sm font-semibold">
-                        {entry.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                    <ProfileAvatar
+                      src={entry.avatar_url}
+                      name={entry.name}
+                      className={`size-9 rounded-full ${entry.avatar_url ? "object-cover" : "object-contain"}`}
+                    />
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-semibold">{entry.name}</span>
                       <span className="block truncate font-mono text-xs text-muted-foreground">@{entry.username}</span>

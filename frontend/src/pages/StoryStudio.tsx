@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { DEFAULT_PROFILE_AVATAR } from "@/components/shared/ProfileAvatar";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -303,15 +304,15 @@ function drawStory(
 
   ctx.fillStyle = "rgba(255, 255, 255, 0.82)";
   ctx.font = "600 24px 'DM Sans Variable', sans-serif";
-  ctx.fillText(`@${username.replace(/^@/, "")}`, width / 2, 466);
+  ctx.fillText(`@${username.replace(/^@/, "")}`, width / 2, 454);
 
   ctx.fillStyle = "#fff";
   ctx.font = "700 48px 'DM Sans Variable', sans-serif";
-  ctx.fillText("a little question", width / 2, 492);
-  ctx.fillText("from my inbox…", width / 2, 548);
+  ctx.fillText("a little question", width / 2, 528);
+  ctx.fillText("from my inbox…", width / 2, 584);
 
   const cardX = 68;
-  const cardY = 606;
+  const cardY = 636;
   const cardWidth = width - cardX * 2;
   const cardHeight = 816;
   ctx.shadowColor = "rgba(12, 8, 20, 0.28)";
@@ -429,7 +430,6 @@ export default function StoryStudio() {
   useEffect(() => {
     setAvatar(null);
     setPhotoError(false);
-    if (!me?.avatar_url) return;
 
     let isCurrent = true;
     const image = new Image();
@@ -438,9 +438,14 @@ export default function StoryStudio() {
       if (isCurrent) setAvatar(image);
     };
     image.onerror = () => {
-      if (isCurrent) setPhotoError(true);
+      if (!isCurrent) return;
+      if (image.src !== new URL(DEFAULT_PROFILE_AVATAR, window.location.origin).href) {
+        image.src = DEFAULT_PROFILE_AVATAR;
+      } else {
+        setPhotoError(true);
+      }
     };
-    image.src = me.avatar_url;
+    image.src = me?.avatar_url || DEFAULT_PROFILE_AVATAR;
 
     return () => {
       isCurrent = false;

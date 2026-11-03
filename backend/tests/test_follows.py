@@ -124,6 +124,7 @@ async def test_explore_marks_creators_followed_by_current_account(monkeypatch):
 
     class FakeUsers:
         def find(self, query):
+            assert query["explore_visible"] == {"$ne": False}
             return FakeCursor([
                 {
                     "id": "creator-1",

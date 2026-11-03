@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  ArrowUpRight, BarChart3, Check, Eye, Heart, Image, Inbox, Link2, MousePointerClick,
+  ArrowUpRight, BarChart3, Check, Eye, EyeOff, Heart, Image, Inbox, Link2, MousePointerClick,
   Trophy, Wand2,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
@@ -30,6 +30,18 @@ export default function DashboardHome() {
     },
     onError: (error) => {
       toast.error(error instanceof ApiError ? error.detail : "Could not update your ranking preference");
+    },
+  });
+  const exploreVisibility = useMutation({
+    mutationFn: (visible: boolean) =>
+      apiPatch<MeProfile>("/me/profile", { explore_visible: visible }),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["me"], updated);
+      void queryClient.invalidateQueries({ queryKey: ["explore"] });
+      toast.success(updated.explore_visible ? "Your profile is visible in Explore" : "Your profile is hidden from Explore");
+    },
+    onError: (error) => {
+      toast.error(error instanceof ApiError ? error.detail : "Could not update your Explore visibility");
     },
   });
   const { data: analytics } = useQuery({
@@ -75,9 +87,9 @@ export default function DashboardHome() {
   ];
 
   const checklist = [
-    { done: !!bundle && bundle.links.length > 0, label: "Add at least one link", to: "/dashboard/links" },
-    { done: !!bundle && bundle.gallery.length > 0, label: "Pin a gallery moment", to: "/dashboard/showcase" },
-    { done: !!bundle && !!bundle.poll, label: "Launch a poll", to: "/dashboard/showcase" },
+    { done: !!me?.avatar_url, label: "Add a profile photo", detail: "A clear portrait helps people recognize you.", to: "/dashboard/customize" },
+    { done: !!bundle && bundle.links.length > 0, label: "Add your first link", detail: "Make your important pages easy to find.", to: "/dashboard/links" },
+    { done: !!bundle && bundle.gallery.length > 0, label: "Add a photo or moment", detail: "Show visitors what you create.", to: "/dashboard/showcase" },
   ];
   const completedChecklistItems = checklist.filter((item) => item.done).length;
 
@@ -94,7 +106,7 @@ export default function DashboardHome() {
                   Hey {me?.name.split(" ")[0]}
                 </h1>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground sm:text-base">
-                  Your AURA page is live and ready to make an impression.
+                  Start with a few small steps. Your changes appear in the live preview.
                 </p>
               </div>
               <Link
@@ -107,6 +119,59 @@ export default function DashboardHome() {
               </Link>
             </div>
           </header>
+
+          <Card className="border-primary/15 bg-card shadow-sm" data-testid="getting-started-card">
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="font-heading font-bold">Your first steps</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {completedChecklistItems} of {checklist.length} complete · Do them in any order.
+                  </p>
+                </div>
+                <span className="grid size-10 place-items-center rounded-2xl bg-primary/8 text-primary">
+                  <Check className="size-5" />
+                </span>
+              </div>
+              <div
+                className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-label="Getting started progress"
+                aria-valuemin={0}
+                aria-valuemax={checklist.length}
+                aria-valuenow={completedChecklistItems}
+              >
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-500"
+                  style={{ width: `${(completedChecklistItems / checklist.length) * 100}%` }}
+                />
+              </div>
+              <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+                {checklist.map((item) => (
+                  <li key={item.label} className="min-w-0">
+                    <Link
+                      to={item.to}
+                      className="flex h-full min-h-20 items-start gap-2.5 rounded-xl bg-muted/50 px-3 py-3 transition-colors hover:bg-muted"
+                    >
+                      <span
+                        className={cn(
+                          "mt-0.5 grid size-5 shrink-0 place-items-center rounded-full border text-[10px]",
+                          item.done ? "border-emerald-500 bg-emerald-500 text-white" : "text-muted-foreground"
+                        )}
+                        aria-hidden
+                      >
+                        {item.done ? <Check className="size-3" /> : null}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold leading-snug">{item.label}</span>
+                        <span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{item.detail}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
 
           {/* metrics */}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -161,6 +226,35 @@ export default function DashboardHome() {
           <Card className="border-border/70 bg-card shadow-sm">
             <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
               <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary">
+                {me?.explore_visible !== false
+                  ? <Eye className="size-4" aria-hidden="true" />
+                  : <EyeOff className="size-4" aria-hidden="true" />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <label htmlFor="explore-visible" className="cursor-pointer text-sm font-semibold">
+                    Show my profile in Explore
+                  </label>
+                  <Checkbox
+                    id="explore-visible"
+                    checked={me?.explore_visible !== false}
+                    disabled={exploreVisibility.isPending}
+                    onCheckedChange={(checked) => exploreVisibility.mutate(checked === true)}
+                    data-testid="explore-visibility-checkbox"
+                  />
+                </div>
+                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                  {me?.explore_visible === false
+                    ? "Hidden from Explore. Your profile link still works."
+                    : "Visible to everyone in Explore. Turn this off to hide your profile there."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/70 bg-card shadow-sm">
+            <CardContent className="flex items-start gap-3.5 p-4 sm:p-5">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-primary/8 text-primary">
                 <Trophy className="size-4" />
               </span>
               <div className="min-w-0 flex-1">
@@ -209,52 +303,6 @@ export default function DashboardHome() {
             </div>
           </section>
 
-          <Card className="border-border/70 bg-card shadow-sm">
-            <CardContent className="p-4 sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="label-caps text-muted-foreground">Your AURA checklist</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {completedChecklistItems} of {checklist.length} steps complete
-                  </p>
-                </div>
-                <span className="grid size-10 place-items-center rounded-2xl bg-primary/8 text-primary">
-                  <Check className="size-5" />
-                </span>
-              </div>
-              <div
-                className="mt-4 h-1.5 overflow-hidden rounded-full bg-muted"
-                role="progressbar"
-                aria-label="AURA checklist progress"
-                aria-valuemin={0}
-                aria-valuemax={checklist.length}
-                aria-valuenow={completedChecklistItems}
-              >
-                <div
-                  className="h-full rounded-full bg-primary transition-[width] duration-500"
-                  style={{ width: `${(completedChecklistItems / checklist.length) * 100}%` }}
-                />
-              </div>
-              <ul className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
-                {checklist.map((item) => (
-                  <li key={item.label} className="flex min-w-0 items-center gap-2.5 rounded-xl bg-muted/50 px-3 py-2.5">
-                    <span
-                      className={cn(
-                        "grid size-5 shrink-0 place-items-center rounded-full border text-[10px]",
-                        item.done ? "border-emerald-500 bg-emerald-500 text-white" : "text-muted-foreground"
-                      )}
-                      aria-hidden
-                    >
-                      {item.done ? <Check className="size-3" /> : null}
-                    </span>
-                    <Link to={item.to} className="min-w-0 leading-snug hover:underline">
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
         </div>
 
         {/* live phone preview */}

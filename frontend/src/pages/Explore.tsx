@@ -17,6 +17,33 @@ import { themeOf } from "@/lib/themes";
 
 const TAGS = ["Design", "Tech", "Music", "Gaming", "Fitness", "Photography", "Art"];
 
+function ExploreAvatar({ src, name }: { src?: string | null; name: string }) {
+  const [failedSource, setFailedSource] = useState<string | null>(null);
+  const initial = [...name.trim()][0]?.toLocaleUpperCase() ?? "?";
+
+  if (!src || failedSource === src) {
+    return (
+      <span
+        role="img"
+        aria-label={`${name || "Profile"} avatar`}
+        className="absolute inset-0 grid size-full place-items-center rounded-full bg-primary/10 text-2xl font-semibold text-primary"
+      >
+        {initial}
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={`${name}'s profile photo`}
+      className="absolute inset-0 size-full rounded-full object-cover"
+      loading="lazy"
+      onError={() => setFailedSource(src)}
+    />
+  );
+}
+
 export default function Explore() {
   const [q, setQ] = useState("");
   const [tag, setTag] = useState("");
@@ -167,16 +194,11 @@ export default function Explore() {
               </div>
               <div className="relative z-10 p-5 pt-0">
                 <div className="-mt-8 flex items-end justify-between">
-                  <span className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-full bg-primary/15 font-heading text-xl font-bold text-primary ring-4 ring-card">
-                    <span aria-hidden="true">{card.name.charAt(0).toUpperCase()}</span>
-                    {card.avatar_url && (
-                      <img
-                        src={card.avatar_url}
-                        alt=""
-                        className="absolute inset-0 size-full rounded-full object-cover"
-                        onError={(event) => { event.currentTarget.style.display = "none"; }}
-                      />
-                    )}
+                  <span className="relative grid size-16 shrink-0 place-items-center overflow-hidden rounded-full ring-4 ring-card">
+                    <ExploreAvatar
+                      src={card.avatar_url}
+                      name={card.name}
+                    />
                   </span>
                   {card.plan !== "free" && (
                     <Badge variant="secondary" className="mb-1 gap-1 capitalize">

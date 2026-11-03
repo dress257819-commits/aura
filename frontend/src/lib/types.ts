@@ -47,6 +47,7 @@ export interface MeProfile {
   music: MusicTrack[];
   appearance: Appearance;
   chatbot?: ChatbotSettings;
+  explore_visible: boolean;
   leaderboard_visible: boolean;
   plan: string;
   created_at: string;

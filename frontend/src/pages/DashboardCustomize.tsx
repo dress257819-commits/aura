@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Check, ExternalLink, LoaderCircle, Lock, Paintbrush, Upload, X,
+  Check, ExternalLink, LoaderCircle, Lock, Paintbrush, Save, Upload, X,
 } from "lucide-react";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { ProfileAvatar } from "@/components/shared/ProfileAvatar";
 import { PhoneFrame } from "@/components/shared/PhoneFrame";
 import { ProfileCanvas } from "@/components/profile/ProfileCanvas";
 import { UpgradeModal } from "@/components/shared/UpgradeModal";
@@ -43,9 +44,7 @@ const FONT_MIN_PLAN: Record<string, string> = {
 const ACCENT_PRESETS = ["#8B5CF6", "#EC4899", "#22C55E", "#0EA5E9", "#F97316", "#EAB308"];
 const INTEREST_OPTIONS = ["Design", "Tech", "Music", "Gaming", "Fitness", "Photography", "Art"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 25 * 1024 * 1024;
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
-const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime", "video/x-m4v"]);
 
 function isUnlocked(plan: string, requiredPlan?: string) {
   return !requiredPlan || (PLAN_RANK[plan] ?? 0) >= (PLAN_RANK[requiredPlan] ?? 0);
@@ -139,6 +138,7 @@ function ProfileMediaField({
   onFileChange: (file: File | null) => void;
 }) {
   const [backgroundRemoval, setBackgroundRemoval] = useState<BackgroundRemovalProgress | null>(null);
+  const [imageUrlOpen, setImageUrlOpen] = useState(false);
   const localPreview = useFilePreview(file);
   const src = localPreview || imageUrl;
 
@@ -180,18 +180,12 @@ function ProfileMediaField({
           </div>
         ) : (
           <div className="flex items-center gap-3 p-3">
-            <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-background bg-primary/10 text-primary shadow-sm">
-              {src ? (
-                <img
-                  key={src}
-                  src={src}
-                  alt="Profile photo preview"
-                  className="size-full object-contain"
-                  onError={(event) => { event.currentTarget.style.visibility = "hidden"; }}
-                />
-              ) : (
-                <span className="text-xl font-semibold">A</span>
-              )}
+            <div className="grid size-16 shrink-0 place-items-center overflow-hidden rounded-full border-2 border-background bg-primary/5 shadow-sm">
+              <ProfileAvatar
+                src={src}
+                name="Your profile"
+                className={cn("size-full", src ? "object-cover" : "object-contain")}
+              />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold">Your profile photo</p>
@@ -200,6 +194,16 @@ function ProfileMediaField({
           </div>
         )}
         <div className="space-y-3 border-t border-border/70 bg-card p-3">
+          {kind === "avatar" && (
+            <details className="group rounded-xl border border-border/70 bg-muted/30 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-foreground">
+                Tips for a cleaner background removal
+              </summary>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                A clear, well-lit portrait against a plain light background works best.
+              </p>
+            </details>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <label className="inline-flex h-8 cursor-pointer items-center gap-2 rounded-lg border border-border bg-background px-3 text-sm font-medium transition-colors hover:border-primary/40 hover:text-primary">
               {backgroundRemoval
@@ -207,32 +211,24 @@ function ProfileMediaField({
                 : <Upload className="size-3.5" />}
               {backgroundRemoval
                 ? backgroundRemoval.stage === "loading"
-                  ? `Loading background remover${backgroundRemoval.percent === undefined ? "…" : ` ${backgroundRemoval.percent}%`}`
+                  ? `Preparing photo tool${backgroundRemoval.percent === undefined ? "…" : ` ${backgroundRemoval.percent}%`}`
                   : "Removing background…"
-                : file ? "Choose another" : kind === "cover" ? "Upload image or video" : "Upload image"}
+                : file ? "Choose another" : "Upload image"}
               <input
                 type="file"
-                accept={kind === "cover"
-                  ? "image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime,video/x-m4v"
-                  : "image/jpeg,image/png,image/gif,image/webp"}
+                accept="image/jpeg,image/png,image/gif,image/webp"
                 className="sr-only"
                 disabled={!!backgroundRemoval}
                 onClick={(event) => { event.currentTarget.value = ""; }}
                 onChange={async (event) => {
                   const selected = event.currentTarget.files?.[0];
                   if (!selected) return;
-                  const isVideo = kind === "cover" && (
-                    VIDEO_TYPES.has(selected.type) || /\.(mp4|webm|mov|m4v)$/i.test(selected.name)
-                  );
-                  if (!IMAGE_TYPES.has(selected.type) && !isVideo) {
-                    toast.error(kind === "cover"
-                      ? "Choose a JPEG, PNG, GIF, WebP, MP4, WebM, or MOV file"
-                      : "Choose a JPEG, PNG, GIF, or WebP image");
+                  if (!IMAGE_TYPES.has(selected.type)) {
+                    toast.error("Choose a JPEG, PNG, GIF, or WebP image");
                     return;
                   }
-                  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-                  if (selected.size > maxBytes) {
-                    toast.error(`Files must be ${isVideo ? 25 : 5} MB or smaller`);
+                  if (selected.size > MAX_IMAGE_BYTES) {
+                    toast.error("Images must be 5 MB or smaller");
                     return;
                   }
                   if (kind !== "avatar" || selected.type === "image/gif") {
@@ -277,23 +273,33 @@ function ProfileMediaField({
               </Button>
             )}
           </div>
-          <Input
-            value={imageUrl}
-            onChange={(event) => {
-              onImageUrlChange(event.target.value);
-              onFileChange(null);
-            }}
-            placeholder="Or paste an image URL"
-            inputMode="url"
-            autoCapitalize="none"
-            autoCorrect="off"
-            maxLength={500}
-            aria-label={`${label} image URL`}
-          />
+          <details
+            open={imageUrlOpen}
+            onToggle={(event) => setImageUrlOpen(event.currentTarget.open)}
+            className="group"
+          >
+            <summary className="w-fit cursor-pointer list-none text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-4 hover:text-foreground [&::-webkit-details-marker]:hidden">
+              Use an image link instead
+            </summary>
+            <Input
+              value={imageUrl}
+              onChange={(event) => {
+                onImageUrlChange(event.target.value);
+                onFileChange(null);
+              }}
+              className="mt-2 border-border bg-background"
+              placeholder="Paste an image link"
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              maxLength={500}
+              aria-label={`${label} image URL`}
+            />
+          </details>
           <p className="text-xs text-muted-foreground">
             {kind === "cover"
-              ? "Images up to 5 MB · videos up to 25 MB"
-              : "Portrait background removal runs in your browser. The AI model downloads the first time; the photo uploads only when you save."}
+              ? "JPEG, PNG, GIF, or WebP · up to 5 MB"
+              : "Background removal happens on your device. Save changes to update your profile."}
           </p>
         </div>
       </div>
@@ -549,7 +555,7 @@ export default function DashboardCustomize() {
 
   return (
     <DashboardShell active="Customize">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className={cn("mx-auto max-w-6xl space-y-6", hasProfileChanges && "pb-24 sm:pb-0")}>
         <header className="relative overflow-hidden rounded-3xl border border-border/70 bg-card px-5 py-6 shadow-sm sm:px-7 sm:py-8">
           <div className="pointer-events-none absolute -right-10 -top-14 size-48 rounded-full bg-primary/10 blur-3xl" />
           <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -557,7 +563,7 @@ export default function DashboardCustomize() {
               <p className="label-caps mb-2 text-muted-foreground">Make it yours</p>
               <h1 className="font-heading text-3xl font-bold tracking-tight">Customize your page</h1>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
-                Make your profile feel like you. Preview every change on your mobile page as you go.
+                Update your details here and preview them as you go. Save once to publish; design choices save automatically.
               </p>
             </div>
             {me && (
@@ -578,17 +584,45 @@ export default function DashboardCustomize() {
           <div className="min-w-0 space-y-5">
             <Card className="border-border/70 bg-card shadow-sm">
               <CardContent className="space-y-5 p-5 sm:p-6">
-                <div>
-                  <p className="font-heading text-lg font-bold">Profile details</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    These are the details visitors see on your mobile profile.
-                  </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-heading text-lg font-bold">Profile details</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      These are the details visitors see on your page.
+                    </p>
+                  </div>
+                  {hasProfileChanges ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="hidden sm:inline-flex"
+                      onClick={() => profileDraft && saveProfile.mutate(profileDraft)}
+                      disabled={!usernameValid || !usernameAvailable || usernameCheckPending || usernameAvailability.isError || saveProfile.isPending}
+                      data-testid="customize-save-profile-top"
+                    >
+                      {saveProfile.isPending
+                        ? <LoaderCircle className="size-4 animate-spin" />
+                        : <Save className="size-4" />}
+                      {saveProfile.isPending ? "Saving…" : "Save changes"}
+                    </Button>
+                  ) : (
+                    <span className="hidden items-center gap-1.5 text-xs font-medium text-muted-foreground sm:inline-flex" aria-live="polite">
+                      <Check className="size-3.5 text-emerald-600" /> All changes saved
+                    </span>
+                  )}
                 </div>
+                <p className="text-xs text-muted-foreground" aria-live="polite">
+                  {saveProfile.isPending
+                    ? "Saving your profile…"
+                    : hasProfileChanges
+                      ? "Unsaved changes — save to publish them."
+                      : "Edit any detail to get started."}
+                </p>
                 {profileDraft && (
                   <>
                     <div className="space-y-2">
                       <Label htmlFor="customize-username">Your profile link</Label>
-                      <div className="flex items-center rounded-xl border border-input bg-background px-3 focus-within:ring-2 focus-within:ring-ring/50">
+                      <div className="flex items-center rounded-xl border border-border bg-background px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/25">
                         <span className="shrink-0 text-sm text-muted-foreground">/u/</span>
                         <input
                           id="customize-username"
@@ -622,18 +656,18 @@ export default function DashboardCustomize() {
                         imageUrl={profileDraft.avatar_url}
                         file={profileDraft.avatar_file}
                         kind="avatar"
-                        onImageUrlChange={(avatar_url) => setProfileDraft({ ...profileDraft, avatar_url })}
-                        onFileChange={(avatar_file) => setProfileDraft({ ...profileDraft, avatar_file })}
+                        onImageUrlChange={(avatar_url) => setProfileDraft((current) => current && ({ ...current, avatar_url }))}
+                        onFileChange={(avatar_file) => setProfileDraft((current) => current && ({ ...current, avatar_file }))}
                       />
                       {me && me.plan !== "free" ? (
                         <ProfileMediaField
                           label="Profile banner"
-                          description="Shown beneath your profile photo. Images and video are supported."
+                          description="Shown beneath your profile photo."
                           imageUrl={profileDraft.cover_url}
                           file={profileDraft.cover_file}
                           kind="cover"
-                          onImageUrlChange={(cover_url) => setProfileDraft({ ...profileDraft, cover_url })}
-                          onFileChange={(cover_file) => setProfileDraft({ ...profileDraft, cover_file })}
+                          onImageUrlChange={(cover_url) => setProfileDraft((current) => current && ({ ...current, cover_url }))}
+                          onFileChange={(cover_file) => setProfileDraft((current) => current && ({ ...current, cover_file }))}
                         />
                       ) : (
                         <div className="rounded-2xl border border-dashed border-border p-4">
@@ -757,16 +791,6 @@ export default function DashboardCustomize() {
                         maxLength={200}
                         data-testid="customize-question-input"
                       />
-                    </div>
-                    <div className="flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                      <p className="text-xs text-muted-foreground">Your unsaved edits also appear in the preview.</p>
-                      <Button
-                        onClick={() => saveProfile.mutate(profileDraft)}
-                        disabled={!hasProfileChanges || !usernameValid || !usernameAvailable || usernameCheckPending || usernameAvailability.isError || saveProfile.isPending}
-                        data-testid="customize-save-profile"
-                      >
-                        {saveProfile.isPending ? "Saving profile…" : "Save profile details"}
-                      </Button>
                     </div>
                   </>
                 )}
@@ -1218,6 +1242,31 @@ export default function DashboardCustomize() {
           </aside>
         </div>
       </div>
+      {hasProfileChanges && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-border/80 bg-background/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur sm:hidden"
+          data-testid="customize-sticky-save"
+        >
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+            <p className="min-w-0 text-xs font-medium text-muted-foreground sm:text-sm" aria-live="polite">
+              Unsaved profile changes
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="shrink-0"
+              onClick={() => profileDraft && saveProfile.mutate(profileDraft)}
+              disabled={!usernameValid || !usernameAvailable || usernameCheckPending || usernameAvailability.isError || saveProfile.isPending}
+              data-testid="customize-sticky-save-button"
+            >
+              {saveProfile.isPending
+                ? <LoaderCircle className="size-4 animate-spin" />
+                : <Save className="size-4" />}
+              {saveProfile.isPending ? "Saving…" : "Save changes"}
+            </Button>
+          </div>
+        </div>
+      )}
       <UpgradeModal
         open={upgradeOpen}
         onOpenChange={setUpgradeOpen}

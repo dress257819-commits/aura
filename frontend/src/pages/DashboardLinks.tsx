@@ -9,6 +9,7 @@ import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -335,7 +336,7 @@ export default function DashboardLinks() {
 
       {/* add / edit dialog */}
       <Dialog open={!!form} onOpenChange={(open) => !open && setForm(null)}>
-        <DialogContent className="max-h-[90svh] overflow-y-auto sm:max-w-lg" data-testid="link-form-dialog">
+        <DialogContent className="min-w-0 max-h-[90svh] overflow-x-hidden overflow-y-auto sm:max-w-lg" data-testid="link-form-dialog">
           <DialogHeader>
             <DialogTitle className="font-heading text-xl">{form?.id ? "Edit your link" : "Add a link"}</DialogTitle>
             <DialogDescription>
@@ -343,7 +344,7 @@ export default function DashboardLinks() {
             </DialogDescription>
           </DialogHeader>
           {form && (
-            <div className="space-y-4">
+            <div className="min-w-0 w-full space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="link-platform">Platform</Label>
                 <Select
@@ -373,6 +374,7 @@ export default function DashboardLinks() {
                 <Label htmlFor="link-title">Title</Label>
                 <Input
                   id="link-title"
+                  className="max-w-full"
                   value={form.title}
                   onChange={(e) => setForm({ ...form, title: e.target.value })}
                   placeholder={`My ${PLATFORMS[form.platform]?.label ?? "website"}`}
@@ -384,6 +386,7 @@ export default function DashboardLinks() {
                 <Label htmlFor="link-url">URL</Label>
                 <Input
                   id="link-url"
+                  className="max-w-full"
                   value={form.url}
                   onChange={(e) => setForm({ ...form, url: e.target.value })}
                   type="text"
@@ -397,12 +400,14 @@ export default function DashboardLinks() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="link-desc">Description <span className="font-normal text-muted-foreground">· optional</span></Label>
-                <Input
+                <Textarea
                   id="link-desc"
+                  className="min-h-16 max-h-28 max-w-full resize-y overflow-y-auto [overflow-wrap:anywhere]"
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="A little more about where this link goes"
                   maxLength={140}
+                  rows={2}
                   data-testid="link-description-input"
                 />
               </div>
@@ -446,6 +451,7 @@ export default function DashboardLinks() {
                 </div>
                 <Input
                   id="link-thumb"
+                  className="max-w-full"
                   value={form.thumbnail_url}
                   onChange={(e) => setForm({ ...form, thumbnail_url: e.target.value, thumbnail_file: null })}
                   inputMode="url"
@@ -497,6 +503,7 @@ export default function DashboardLinks() {
                 </div>
                 <Input
                   id="link-icon-url"
+                  className="max-w-full"
                   value={form.icon_url}
                   onChange={(e) => setForm({ ...form, icon_url: e.target.value, icon_file: null })}
                   inputMode="url"
